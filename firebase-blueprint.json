@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user preferences and profile data.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "notificationsEnabled": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Reading": {
+      "title": "Astrology Reading",
+      "description": "Stores a generated reading result.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "result": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "result", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile document."
+    },
+    "users/{userId}/readings/{readingId}": {
+      "schema": { "$ref": "#/entities/Reading" },
+      "description": "User's readings."
+    }
+  }
+}
