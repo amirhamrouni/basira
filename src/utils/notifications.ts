@@ -29,7 +29,7 @@ export async function requestPermission() {
 }
 
 export function sendNotification(title: string, body: string) {
-    if (Notification.permission === 'granted') {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(title, { body });
     }
 }

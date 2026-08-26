@@ -34,11 +34,10 @@ export class ErrorBoundary extends React.Component<{children: React.ReactNode}, 
                     >
                         Restore Connection
                     </button>
-                    {import.meta.env.DEV && (
-                        <pre className="mt-4 p-4 bg-black/50 text-red-300 text-left text-xs rounded overflow-auto max-w-full">
-                            {this.state.error?.message}
-                        </pre>
-                    )}
+                    <pre className="mt-4 p-4 bg-black/50 text-red-300 text-left text-xs rounded overflow-auto max-w-full whitespace-pre-wrap">
+                        Error: {this.state.error?.message}
+                        {"\n\nStack: " + this.state.error?.stack}
+                    </pre>
                 </div>
             );
         }

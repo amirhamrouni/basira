@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, getAuth, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics, isSupported as isAnalyticsSupported, Analytics } from 'firebase/analytics';
 import { getRemoteConfig, fetchAndActivate, getValue, RemoteConfig } from 'firebase/remote-config';
@@ -7,8 +7,20 @@ import { getPerformance, FirebasePerformance } from 'firebase/performance';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); 
-export const auth = getAuth(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Use browserLocalPersistence (IndexedDB) — works in Android WebView unlike sessionStorage
+let auth: ReturnType<typeof getAuth>;
+try {
+    auth = initializeAuth(app, {
+        persistence: browserLocalPersistence,
+    });
+} catch (e) {
+    // Already initialized (e.g. hot-reload)
+    auth = getAuth(app);
+}
+export { auth };
+
 
 // Initialize optional services
 let analytics: Analytics | null = null;

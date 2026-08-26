@@ -3,6 +3,9 @@
 // Retrieve production backend API URL from Vite environment variables (if set)
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
+// Production backend URL for mobile (Capacitor) builds
+const PRODUCTION_API_URL = 'https://basira-qx6d.onrender.com';
+
 export function getApiUrl(endpoint: string): string {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     
@@ -10,10 +13,11 @@ export function getApiUrl(endpoint: string): string {
     const isCapacitor = (window as any).Capacitor !== undefined || window.hasOwnProperty('Capacitor');
     
     if (isCapacitor) {
-        // If a custom API URL is set in env, use it, otherwise default to Android Emulator localhost mapping
-        return `${API_BASE_URL || 'http://10.0.2.2:3000'}${cleanEndpoint}`;
+        // In production mobile builds, use the deployed backend URL
+        return `${API_BASE_URL || PRODUCTION_API_URL}${cleanEndpoint}`;
     }
     
     // For standard web browsers, relative URLs work perfectly with the proxy/Vite server
     return `${API_BASE_URL}${cleanEndpoint}`;
 }
+

@@ -103,15 +103,15 @@ async function fetchRealHoroscope(sign, day = 'today') {
 }
 
 /**
- * Gemini AI with retry logic (max 3 attempts).
+ * Unified AI with retry logic (max 3 attempts).
  */
-async function generateWithRetry(ai, callFn, maxRetries = 3) {
+async function generateWithRetry(callFn, maxRetries = 3) {
     let attempt = 0;
     let lastError;
 
     while (attempt < maxRetries) {
         try {
-            return await withTimeout(callFn(), API_TIMEOUT_MS, 'Gemini');
+            return await withTimeout(callFn(), API_TIMEOUT_MS, 'AI Call');
         } catch (error) {
             lastError = error;
             attempt++;
@@ -124,7 +124,7 @@ async function generateWithRetry(ai, callFn, maxRetries = 3) {
 
             if (isRetryable && attempt < maxRetries) {
                 const delay = attempt * 2000;
-                console.warn(`[Gemini] Attempt ${attempt} failed. Retrying in ${delay}ms...`);
+                console.warn(`[AI] Attempt ${attempt} failed. Retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
             } else {
                 throw lastError;
@@ -146,7 +146,7 @@ async function startServer() {
     const initAI = () => {
         const key = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
         if (!key) {
-            console.warn('WARNING: Gemini API Key missing. Add GEMINI_API_KEY to environment.');
+            console.warn('WARNING: Gemini API Key missing.');
             return null;
         }
         return new GoogleGenAI({ apiKey: key });
@@ -154,9 +154,111 @@ async function startServer() {
 
     const ai = initAI();
 
+    // Unified AI router supporting Groq & Gemini
+    async function generateContent({ contents, config }) {
+        const groqKey = process.env.GROQ_API_KEY;
+        if (groqKey) {
+            console.log('[AI] Routing request to Groq...');
+            let messages = [];
+            let groqModel = 'llama-3.3-70b-versatile'; // Strongest text model
+            
+            let userContentParts = [];
+            let hasImage = false;
+            
+            if (Array.isArray(contents)) {
+                for (const item of contents) {
+                    if (item.parts) {
+                        for (const part of item.parts) {
+                            if (part.text) {
+                                userContentParts.push({ type: 'text', text: part.text });
+                            } else if (part.inlineData) {
+                                hasImage = true;
+                                userContentParts.push({
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+                                    }
+                                });
+                            }
+                        }
+                    } else if (item.text) {
+                        userContentParts.push({ type: 'text', text: item.text });
+                    } else if (item.inlineData) {
+                        hasImage = true;
+                        userContentParts.push({
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:${item.inlineData.mimeType};base64,${item.inlineData.data}`
+                            }
+                        });
+                    } else if (typeof item === 'string') {
+                        userContentParts.push({ type: 'text', text: item });
+                    }
+                }
+            } else if (typeof contents === 'string') {
+                userContentParts.push({ type: 'text', text: contents });
+            } else if (contents && typeof contents === 'object') {
+                if (contents.parts) {
+                    for (const part of contents.parts) {
+                        if (part.text) {
+                            userContentParts.push({ type: 'text', text: part.text });
+                        } else if (part.inlineData) {
+                            hasImage = true;
+                            userContentParts.push({
+                                type: 'image_url',
+                                image_url: {
+                                    url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+            
+            if (hasImage) {
+                groqModel = 'llama-3.2-11b-vision-preview'; // Vision-capable model
+            }
+            
+            messages.push({ role: 'user', content: userContentParts });
+            
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${groqKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: groqModel,
+                    messages: messages,
+                    temperature: config?.temperature ?? 0.85,
+                    max_tokens: config?.maxOutputTokens ?? 800
+                })
+            });
+            
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Groq API returned error: ${response.status} - ${errText}`);
+            }
+            
+            const resData = await response.json();
+            const text = resData.choices?.[0]?.message?.content;
+            return { text };
+        } else {
+            if (!ai) {
+                throw new Error('AI Key missing. Configure GEMINI_API_KEY or GROQ_API_KEY.');
+            }
+            console.log('[AI] Routing request to Gemini...');
+            return await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: contents,
+                config: config
+            });
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ENDPOINT: /api/daily-horoscope
-    // HYBRID AI ENGINE: Real API data → Gemini rewrite
+    // HYBRID AI ENGINE: Real API data → Rewrite
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/daily-horoscope', async (req, res) => {
         const { zodiac, lang = 'ar', date } = req.body;
@@ -165,18 +267,14 @@ async function startServer() {
             return res.status(400).json({ error: 'Missing zodiac sign', reply: getFallback(lang) });
         }
 
-        // Step 1: Fetch real horoscope data from external API
         const realData = await fetchRealHoroscope(zodiac);
 
-        // Step 2: If AI is unavailable, return real data or fallback
-        if (!ai) {
-            const reply = realData.success
-                ? realData.text
-                : getFallback(lang);
+        // If no API key is set anywhere, return raw data or fallback
+        if (!ai && !process.env.GROQ_API_KEY) {
+            const reply = realData.success ? realData.text : getFallback(lang);
             return res.json({ reply, source: realData.success ? 'real_api' : 'fallback' });
         }
 
-        // Step 3: Build hybrid Gemini prompt using real data as grounding context
         const zodiacName = getZodiacName(zodiac, lang);
         const langInstruction = lang === 'ar'
             ? 'اكتب بالكامل باللغة العربية الفصيحة الشاعرية'
@@ -196,7 +294,7 @@ ${realData.mood ? `Today's Mood Energy: ${realData.mood}` : ''}
 `
             : `[CONTEXT]: Write a daily horoscope for ${zodiacName} for ${date}.`;
 
-        const hybridPrompt = `You are an elite Chaldæan mystic and psychological astrologer. Your task is to TRANSFORM the following real astrological data into a deeply personal, cinematic, psychological Arabic reading.
+        const hybridPrompt = `You are an elite Chaldæan mystic and psychological astrologer. Your task is to TRANSFORM the following real astrological data into a deeply personal, cinematic, psychological reading.
 
 ${realDataContext}
 
@@ -213,9 +311,8 @@ STRICT RULES:
 Write only the reading. No titles, no labels, no preamble.`;
 
         try {
-            const response = await generateWithRetry(ai, () =>
-                ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+            const response = await generateWithRetry(() =>
+                generateContent({
                     contents: hybridPrompt,
                     config: {
                         temperature: 0.85,
@@ -225,22 +322,21 @@ Write only the reading. No titles, no labels, no preamble.`;
             );
 
             const reply = response.text?.trim();
-            if (!reply) throw new Error('Empty Gemini response');
+            if (!reply) throw new Error('Empty AI response');
 
             return res.json({
                 reply,
                 source: 'hybrid',
                 realDataUsed: realData.success
             });
-        } catch (geminiError) {
-            console.error('[Gemini Daily Horoscope] Error:', geminiError.message);
+        } catch (error) {
+            console.error('[AI Daily Horoscope] Error:', error.message);
 
-            // Graceful degradation: use real data if available, else fallback
             const fallbackReply = realData.success ? realData.text : getFallback(lang);
             return res.json({
                 reply: fallbackReply,
                 source: realData.success ? 'real_api_degraded' : 'fallback',
-                error: geminiError.message
+                error: error.message
             });
         }
     });
@@ -249,7 +345,7 @@ Write only the reading. No titles, no labels, no preamble.`;
     // ENDPOINT: /api/coffee — Coffee Cup Reading
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/coffee', async (req, res) => {
-        if (!ai) {
+        if (!ai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
 
@@ -264,16 +360,12 @@ Write only the reading. No titles, no labels, no preamble.`;
                 ? 'Respond in elegant, poetic Arabic'
                 : lang === 'fr' ? 'Respond in elegant French' : 'Respond in English';
 
-            const response = await generateWithRetry(ai, () =>
-                ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+            const response = await generateWithRetry(() =>
+                generateContent({
                     contents: [
+                        { inlineData: { data: base64Data, mimeType: 'image/jpeg' } },
                         {
-                            role: 'user',
-                            parts: [
-                                { inlineData: { data: base64Data, mimeType: 'image/jpeg' } },
-                                {
-                                    text: `First, critically analyze if this image shows the inside of a coffee cup (فنجان قهوة) with coffee grounds. If not a coffee cup, reply EXACTLY with "ERROR_NOT_A_CUP" and nothing else.
+                            text: `First, critically analyze if this image shows the inside of a coffee cup (فنجان قهوة) with coffee grounds. If not a coffee cup, reply EXACTLY with "ERROR_NOT_A_CUP" and nothing else.
 
 If it IS a coffee cup: You are an elite Chaldæan coffee-ground reader. ${langInstruction}.
 Act as a deeply perceptive human mystic — NOT an AI.
@@ -285,8 +377,6 @@ Rules:
 - Speak of love, ambitions, or transitions — anchor in real human experience
 - FORBIDDEN: "بناءً على", "حسب", "as an AI", "I notice", mechanical phrasing
 - Write 4-5 rich sentences minimum`
-                                }
-                            ]
                         }
                     ],
                     config: { temperature: 0.9, maxOutputTokens: 600 }
@@ -307,7 +397,7 @@ Rules:
     // ENDPOINT: /api/palmistry — Palm Reading
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/palmistry', async (req, res) => {
-        if (!ai) {
+        if (!ai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
         try {
@@ -317,17 +407,11 @@ Rules:
             const base64Data = imageBuffer.split(',')[1];
             if (!base64Data) return res.status(400).json({ error: 'Invalid image format', reply: getFallback(lang) });
 
-            const response = await generateWithRetry(ai, () =>
-                ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+            const response = await generateWithRetry(() =>
+                generateContent({
                     contents: [
-                        {
-                            role: 'user',
-                            parts: [
-                                { text: (context || '') + '\n\n' + (prompt || '') },
-                                { inlineData: { mimeType: 'image/jpeg', data: base64Data } }
-                            ]
-                        }
+                        { text: (context || '') + '\n\n' + (prompt || '') },
+                        { inlineData: { mimeType: 'image/jpeg', data: base64Data } }
                     ],
                     config: { temperature: 0.88, maxOutputTokens: 700 }
                 })
@@ -347,7 +431,7 @@ Rules:
     // ENDPOINT: /api/chat — General Divination/Tarot Chat
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/chat', async (req, res) => {
-        if (!ai) {
+        if (!ai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
 
@@ -355,9 +439,8 @@ Rules:
             const { prompt, context, lang = 'ar' } = req.body;
             if (!prompt) return res.status(400).json({ error: 'Missing prompt', reply: getFallback(lang) });
 
-            const response = await generateWithRetry(ai, () =>
-                ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+            const response = await generateWithRetry(() =>
+                generateContent({
                     contents: `${context || ''}\n\nUser: ${prompt}`,
                     config: { temperature: 0.85, maxOutputTokens: 800 }
                 })
@@ -377,7 +460,7 @@ Rules:
     // ENDPOINT: /api/face — Face/Aura Reading
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/face', async (req, res) => {
-        if (!ai) {
+        if (!ai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
         try {
@@ -391,16 +474,12 @@ Rules:
                 ? 'اكتب بالعربية الفصيحة الشاعرية'
                 : lang === 'fr' ? 'Écris en français élégant' : 'Write in elegant English';
 
-            const response = await generateWithRetry(ai, () =>
-                ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+            const response = await generateWithRetry(() =>
+                generateContent({
                     contents: [
+                        { inlineData: { data: base64Data, mimeType: 'image/jpeg' } },
                         {
-                            role: 'user',
-                            parts: [
-                                { inlineData: { data: base64Data, mimeType: 'image/jpeg' } },
-                                {
-                                    text: `${prompt || ''}
+                            text: `${prompt || ''}
 You are a master physiognomist and aura reader. ${langInstruction}.
 Analyze the face in the image with deep psychological and energetic insight.
 Reference subtle features: eye shape, jawline energy, forehead lines, micro-expressions.
@@ -408,8 +487,6 @@ Do NOT describe the person's appearance mechanically. Instead, translate what yo
 Mention their current environment context naturally: ${deviceData || ''}.
 FORBIDDEN: "AI", "بناءً على", "based on", clinical descriptions, racist/sexist statements.
 Write 5-6 rich, poetic sentences.`
-                                }
-                            ]
                         }
                     ],
                     config: { temperature: 0.9, maxOutputTokens: 600 }
@@ -474,8 +551,13 @@ Write 5-6 rich, poetic sentences.`
     // ─────────────────────────────────────────────────────────────────────────
     const PORT = process.env.PORT || 3000;
     const server = app.listen(PORT, '0.0.0.0', () => {
+        const groqKey = process.env.GROQ_API_KEY;
+        let aiEngine = ai ? '✅ Gemini Connected' : '❌ API Key Missing';
+        if (groqKey) {
+            aiEngine = '✅ Groq Connected (Llama)';
+        }
         console.log(`\n🌟 BASIRA Server v2.0 running on http://localhost:${PORT}`);
-        console.log(`   AI Engine: ${ai ? '✅ Gemini Connected' : '❌ API Key Missing'}`);
+        console.log(`   AI Engine: ${aiEngine}`);
         console.log(`   Environment: ${isProd ? 'Production' : 'Development'}\n`);
     });
 

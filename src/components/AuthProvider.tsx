@@ -2,8 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
     User,
     onAuthStateChanged,
-    signInWithRedirect,
-    getRedirectResult,
+    signInWithPopup,
+    signInAnonymously,
     GoogleAuthProvider,
     signOut,
     AuthError
@@ -56,8 +56,8 @@ const ensureUserProfile = async (currentUser: User) => {
         const docSnap = await getDoc(userRef);
         if (!docSnap.exists()) {
             await setDoc(userRef, {
-                email: currentUser.email,
-                displayName: currentUser.displayName || '',
+                email: currentUser.email || 'guest@basira.com',
+                displayName: currentUser.displayName || (currentUser.isAnonymous ? 'زائر كوني (Guest)' : 'مستخدم بصيرة'),
                 photoURL: currentUser.photoURL || '',
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
@@ -119,31 +119,13 @@ const getAuthErrorMessage = (error: AuthError, lang: string = 'ar'): string => {
         : `Login error: ${error.message}`;
 };
 
+import { AppStateManager } from '../utils/AppStateManager';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
-
-    // Handle redirect result on app load
-    useEffect(() => {
-        const handleRedirectResult = async () => {
-            try {
-                const result = await getRedirectResult(auth);
-                if (result?.user) {
-                    if (analytics) logEvent(analytics, 'login', { method: 'google' });
-                    await ensureUserProfile(result.user);
-                }
-            } catch (error) {
-                const authErr = error as AuthError;
-                if (authErr.code !== 'auth/no-auth-event') {
-                    console.error('Redirect result error:', authErr);
-                    setAuthError(getAuthErrorMessage(authErr));
-                }
-            }
-        };
-        handleRedirectResult();
-    }, []);
 
     // Auth state listener
     useEffect(() => {
@@ -191,29 +173,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = async () => {
         setAuthError(null);
+        const lang = AppStateManager.get('lang') || 'ar';
         try {
-            // Detect if running inside Capacitor (Android/iOS) or plain web
             const isCapacitor = typeof (window as any).Capacitor !== 'undefined';
             if (isCapacitor) {
-                // Mobile WebView: use redirect (popup not supported)
-                await signInWithRedirect(auth, provider);
-            } else {
-                // Web browser: use popup for better UX
-                const { signInWithPopup } = await import('firebase/auth');
-                await signInWithPopup(auth, provider);
+                // In Capacitor, Google Login via Popup/Redirect is restricted by the platform.
+                // Offer Guest (Anonymous) Login directly to let them use the app immediately.
+                const confirmGuest = window.confirm(
+                    lang === 'ar'
+                        ? 'تسجيل الدخول باستخدام جوجل غير مدعوم حالياً على الهاتف. هل تريد الدخول كزائر لتجربة التطبيق؟'
+                        : 'Google Login is not supported on mobile. Would you like to log in as a Guest to try the app?'
+                );
+                if (confirmGuest) {
+                    await signInAnonymously(auth);
+                    return;
+                }
             }
+            await signInWithPopup(auth, provider);
+            if (analytics) logEvent(analytics, 'login', { method: 'google' });
         } catch (error) {
             const authErr = error as AuthError;
-            // Fallback to redirect if popup is blocked
-            if (authErr.code === 'auth/popup-blocked' || authErr.code === 'auth/cancelled-popup-request') {
-                try {
-                    await signInWithRedirect(auth, provider);
-                } catch (redirectError) {
-                    const e = redirectError as AuthError;
-                    setAuthError(getAuthErrorMessage(e));
-                }
-            } else {
-                console.error('Login error:', authErr);
+            console.error('Login error:', authErr);
+            // Automatic fallback to Anonymous login if Google popup fails
+            try {
+                console.log('Attempting anonymous fallback...');
+                await signInAnonymously(auth);
+            } catch (anonError) {
+                console.error('Anonymous login fallback failed:', anonError);
                 setAuthError(getAuthErrorMessage(authErr));
             }
         }

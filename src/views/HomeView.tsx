@@ -12,7 +12,9 @@ export default function HomeView({ t, onNavigate, lang }: { t: any; onNavigate: 
     const [savedZodiacId, setSavedZodiacId] = useState<string | null>(() =>
         AppStateManager.get('favoriteZodiacId')
     );
-    const [hasPermission, setHasPermission] = useState(Notification.permission === 'granted');
+    const [hasPermission, setHasPermission] = useState(() => 
+        typeof window !== 'undefined' && 'Notification' in window ? Notification.permission === 'granted' : false
+    );
 
     const dayIndex = new Date().getDay();
     const phaseIndex = Math.floor(Date.now() / 86400000) % 8;
