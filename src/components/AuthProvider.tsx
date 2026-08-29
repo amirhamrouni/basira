@@ -20,6 +20,7 @@ export interface UserProfile {
     xp: number;
     streak: number;
     vipStatus: 'none' | 'adept' | 'oracle';
+    role?: 'user' | 'admin';
     lastLogin: any;
     displayName?: string;
     email?: string;
@@ -67,7 +68,8 @@ const ensureUserProfile = async (currentUser: User) => {
                 level: 1,
                 xp: 0,
                 streak: 1,
-                vipStatus: 'none'
+                vipStatus: 'none',
+                role: 'user'
             });
             if (analytics) logEvent(analytics, 'sign_up');
         } else {

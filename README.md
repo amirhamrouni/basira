@@ -1,20 +1,47 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# BASIRA
 
-# Run and deploy your AI Studio app
+BASIRA is a multilingual spiritual-entertainment application for web and Android. It combines daily zodiac content, tarot, palm, coffee-cup, and face readings with Firebase accounts and saved reading history.
 
-This contains everything you need to run your app locally.
+> Readings are for entertainment and personal reflection. They are not medical, legal, financial, or psychological advice.
 
-View your app in AI Studio: https://ai.studio/apps/6aad922f-e489-4552-a94a-9a140353fa50
+## Stack
 
-## Run Locally
+- React 19, TypeScript, Vite, and Tailwind CSS
+- Express API with Gemini, OpenAI, or Groq
+- Firebase Authentication, Firestore, Analytics, Remote Config, and Performance
+- Capacitor Android and Render deployment
 
-**Prerequisites:**  Node.js
+## Local development
 
+Node.js 20+ is required.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm ci
+cp .env.example .env
+npm run dev
+```
+
+Set `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `GROQ_API_KEY` in `.env`. Choose the preferred provider with `AI_PROVIDER`. Never expose an AI key through a `VITE_` variable because those values are included in the browser bundle.
+
+## Quality and Android
+
+```bash
+npm run check
+npm audit
+npm run android:sync
+cd android && ./gradlew assembleDebug
+```
+
+`npm run check` runs strict TypeScript validation, automated tests, and the production build.
+
+## Production configuration
+
+Configure the AI key and `ALLOWED_ORIGINS` on Render. To enable subscriptions, set `VITE_CHECKOUT_URL` to a hosted checkout that verifies the Firebase user and updates subscription status securely on the server. Without it, BASIRA reports that payments are unavailable and does not activate a plan.
+
+The admin interface requires a profile with `role: "admin"`. Firestore administrative access additionally requires the Firebase Authentication custom claim `admin: true`; clients cannot grant this permission to themselves.
+
+Deploy the secured Firestore rules before production use:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```

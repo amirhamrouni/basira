@@ -4,19 +4,24 @@ import { Camera, Image as ImageIcon, Sparkles, Loader } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { getApiUrl } from '../utils/api';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { UserChronosMatrix } from '../utils/contextCollector';
 
-export default function FaceView({ t }: any) {
+export default function FaceView({ t, adminPrompt, lang }: any) {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [reading, setReading] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-                simulateReading();
+                const image = reader.result as string;
+                setImagePreview(image);
+                analyzeFace(image);
             };
             reader.readAsDataURL(file);
         }
@@ -38,15 +43,32 @@ export default function FaceView({ t }: any) {
         }
     };
 
-    const simulateReading = () => {
+    const analyzeFace = async (image: string) => {
         setIsScanning(true);
         setReading(null);
-        setTimeout(() => {
-            const result = t.faceOutcomes[Math.floor(Math.random() * t.faceOutcomes.length)];
+        setError(null);
+        try {
+            const response = await fetchWithTimeout(getApiUrl('/api/face'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image,
+                    prompt: adminPrompt,
+                    lang,
+                    deviceData: UserChronosMatrix.fingerprint
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.reply) throw new Error(data.error || 'Reading failed');
+            const result = data.reply as string;
             setReading(result);
+            await saveResult(result);
+        } catch (cause) {
+            console.error('Face reading failed', cause);
+            setError(lang === 'ar' ? 'تعذّر تحليل الصورة الآن. تحقّق من الاتصال وحاول مجدداً.' : lang === 'fr' ? "L’analyse a échoué. Vérifiez la connexion et réessayez." : 'The analysis failed. Check your connection and try again.');
+        } finally {
             setIsScanning(false);
-            saveResult(result);
-        }, 3000);
+        }
     };
 
     return (
@@ -61,6 +83,12 @@ export default function FaceView({ t }: any) {
                     </h2>
                 </div>
             </div>
+
+            {error && (
+                <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 text-center">
+                    {error}
+                </div>
+            )}
 
             <div className="glass-surface p-8 border-stella-border bg-white shadow-sm relative overflow-hidden rounded-[30px] mx-1">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-stella-gold/5 rounded-full blur-3xl animate-pulse-slow"></div>

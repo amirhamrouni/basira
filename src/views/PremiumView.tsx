@@ -40,6 +40,7 @@ export default function PremiumView({ lang }: any) {
     const isAr = lang === 'ar';
     const [selectedTier, setSelectedTier] = useState('oracle');
     const [showAdModal, setShowAdModal] = useState(false);
+    const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
     const { user, profile, login } = useAuth();
     
     const xp = profile?.xp || 0;
@@ -47,6 +48,24 @@ export default function PremiumView({ lang }: any) {
     const nextLevelXp = level * 1000;
     
     const rewardAmount = remoteConfig ? getValue(remoteConfig, 'ad_reward_energy').asNumber() : 10;
+
+    const handleCheckout = () => {
+        if (!user) {
+            login();
+            return;
+        }
+        const checkoutUrl = import.meta.env.VITE_CHECKOUT_URL as string | undefined;
+        if (!checkoutUrl) {
+            setCheckoutMessage(isAr
+                ? 'الاشتراكات غير متاحة للدفع حالياً. لن يتم خصم أي مبلغ.'
+                : 'Payments are not available yet. You will not be charged.');
+            return;
+        }
+        const url = new URL(checkoutUrl);
+        url.searchParams.set('plan', selectedTier);
+        url.searchParams.set('uid', user.uid);
+        window.location.assign(url.toString());
+    };
     
     const handleRewardComplete = async () => {
         if (!user) {
@@ -223,7 +242,9 @@ export default function PremiumView({ lang }: any) {
 
                             <AnimatePresence>
                                 {selectedTier === tier.id && (
-                                    <motion.button 
+                                    <motion.button
+                                        type="button"
+                                        onClick={handleCheckout}
                                         initial={{ opacity: 0, height: 0 }}
                                         animate={{ opacity: 1, height: 'auto' }}
                                         exit={{ opacity: 0, height: 0 }}
@@ -242,6 +263,12 @@ export default function PremiumView({ lang }: any) {
                     ))}
                 </div>
             </div>
+
+            {checkoutMessage && (
+                <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800">
+                    {checkoutMessage}
+                </div>
+            )}
 
             <CosmicRewardModal 
                 isOpen={showAdModal}

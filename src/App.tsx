@@ -46,6 +46,11 @@ export default function App() {
     const [coffeeState, setCoffeeState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false });
 
     const t = LANGUAGE_PACK[lang];
+    const isAdmin = profile?.role === 'admin';
+
+    useEffect(() => {
+        if (activeView === 'admin' && !isAdmin) setActiveView('home');
+    }, [activeView, isAdmin]);
 
     useEffect(() => {
         AppStateManager.set('lang', lang);
@@ -197,7 +202,7 @@ export default function App() {
                             {activeView === 'notifications' && <NotificationsView key="notifications" t={t} lang={lang} />}
                             {activeView === 'other' && <OtherView key="other" t={t} lang={lang} onNavigate={setActiveView} />}
                             {activeView === 'history' && <HistoryView key="history" t={t} lang={lang} onNavigate={setActiveView} />}
-                            {activeView === 'admin' && (
+                            {activeView === 'admin' && isAdmin && (
                                 <AdminView 
                                     key="admin" 
                                     t={t} 

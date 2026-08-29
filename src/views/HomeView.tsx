@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Moon, Star, Quote, RefreshCw, AlertCircle } from 'lucide-react';
+import { Sparkles, Moon, Star, Quote } from 'lucide-react';
 import { horoscopeData } from '../data/horoscopeData';
 import { requestPermission, scheduleDaily } from '../utils/notifications';
 import { getApiUrl } from '../utils/api';
@@ -61,7 +61,7 @@ export default function HomeView({ t, onNavigate, lang }: { t: any; onNavigate: 
     // Dynamic daily horoscope state
     const [dynamicDaily, setDynamicDaily] = useState<string | null>(null);
     const [isLoadingDaily, setIsLoadingDaily] = useState(false);
-    const [dailyError, setDailyError] = useState(false);
+    const [, setDailyError] = useState(false);
 
     useEffect(() => {
         if (!savedZodiacId) return;

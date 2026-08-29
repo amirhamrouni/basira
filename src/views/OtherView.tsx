@@ -1,7 +1,10 @@
 import { motion } from 'framer-motion';
 import { ScanFace, Coffee, Crown, Eye, History } from 'lucide-react';
+import { useAuth } from '../components/AuthProvider';
 
 export default function OtherView({ t, lang, onNavigate }: any) {
+    const { profile } = useAuth();
+    const isAdmin = profile?.role === 'admin';
     return (
         <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-6 w-full pb-10 min-h-screen">
             <div className="text-center mb-2 mt-4 px-2">
@@ -15,7 +18,7 @@ export default function OtherView({ t, lang, onNavigate }: any) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-1">
                 {/* Numerology / Divination */}
-                <motion.div 
+                {isAdmin && <motion.div
                     whileHover={{ scale: 1.02 }}
                     onClick={() => onNavigate('divination')}
                     className="glass-card p-6 border-purple-200 shadow-sm rounded-2xl cursor-pointer bg-gradient-to-br from-purple-50/50 to-white flex items-center gap-4 group hover:shadow-md transition-shadow"
@@ -27,7 +30,7 @@ export default function OtherView({ t, lang, onNavigate }: any) {
                         <h3 className="text-lg font-bold text-purple-800 font-amiri">{t.divination}</h3>
                         <p className="text-xs text-gray-500 font-tajawal mt-1">{t.features.divination}</p>
                     </div>
-                </motion.div>
+                </motion.div>}
 
                 {/* Face Reading */}
                 <motion.div 

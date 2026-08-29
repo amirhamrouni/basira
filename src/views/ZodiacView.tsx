@@ -40,7 +40,6 @@ export default function ZodiacView({ t, lang }: { t: any; lang: 'ar' | 'en' | 'f
     const [dynamicDaily, setDynamicDaily] = useState<string | null>(null);
     const [isLoadingDaily, setIsLoadingDaily] = useState(false);
     const [dailyError, setDailyError] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
 
     const selectedZodiac = horoscopeData.find(z => z.id === selectedZodiacId);
 
@@ -204,7 +203,6 @@ export default function ZodiacView({ t, lang }: { t: any; lang: 'ar' | 'en' | 'f
                             {dailyError && !isLoadingDaily && (
                                 <button
                                     onClick={() => {
-                                        setRetryCount(c => c + 1);
                                         fetchDailyReading(selectedZodiacId!, true);
                                     }}
                                     className="flex items-center gap-1.5 text-xs text-stella-gold hover:text-stella-amber transition-colors font-tajawal"

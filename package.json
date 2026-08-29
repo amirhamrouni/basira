@@ -1,11 +1,15 @@
 {
-  "name": "stella-clone",
+  "name": "basira",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "node server.js",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "android:sync": "npm run build && npx cap sync android",
     "start": "node server.js",
     "preview": "vite preview",
     "render-build": "npm install && npm run build"
@@ -15,7 +19,8 @@
     "@types/express": "^5.0.6",
     "@vitejs/plugin-react": "^6.0.2",
     "tailwindcss": "^3.4.19",
-    "vite": "^8.0.14"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
@@ -30,10 +35,13 @@
     "date-fns": "^4.3.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
     "firebase": "^12.13.0",
     "framer-motion": "^12.40.0",
+    "helmet": "^8.3.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^1.16.0",
+    "openai": "^7.8.0",
     "postcss": "^8.5.15",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
