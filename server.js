@@ -507,9 +507,15 @@ Write 5-6 rich, poetic sentences.`
     // ENDPOINT: /api/health — Server health check
     // ─────────────────────────────────────────────────────────────────────────
     app.get('/api/health', (req, res) => {
+        const geminiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+        const groqKey = process.env.GROQ_API_KEY;
         res.json({
             status: 'ok',
-            aiReady: !!ai,
+            aiReady: !!ai || !!groqKey,
+            providers: {
+                gemini: !!geminiKey,
+                groq: !!groqKey
+            },
             timestamp: new Date().toISOString(),
             version: '2.0.0'
         });
