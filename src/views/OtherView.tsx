@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ScanFace, Coffee, Crown, Eye, History } from 'lucide-react';
+import { ScanFace, Coffee, Crown, Eye, History, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 
 export default function OtherView({ t, lang, onNavigate }: any) {
@@ -43,6 +43,20 @@ export default function OtherView({ t, lang, onNavigate }: any) {
                     <div>
                         <h3 className="text-lg font-bold text-green-800 font-amiri">{t.features.face}</h3>
                         <p className="text-xs text-gray-500 font-tajawal mt-1">{t.features.faceDesc}</p>
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => onNavigate('privacy')}
+                    className="glass-card p-6 border-stella-gold/25 shadow-sm rounded-2xl cursor-pointer flex items-center gap-4 group hover:shadow-md transition-shadow"
+                >
+                    <div className="w-14 h-14 rounded-full bg-stella-gold/10 flex items-center justify-center border border-stella-gold/25">
+                        <ShieldCheck className="text-stella-gold w-7 h-7" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-stella-gold font-amiri">{lang === 'ar' ? 'الخصوصية وحذف الحساب' : 'Privacy & account deletion'}</h3>
+                        <p className="text-xs text-gray-500 font-tajawal mt-1">{lang === 'ar' ? 'بياناتك، الشروط والتحكم الكامل في الحساب' : 'Your data, terms and full account control'}</p>
                     </div>
                 </motion.div>
 
