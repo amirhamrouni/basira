@@ -3,7 +3,8 @@ import {
     User,
     onAuthStateChanged,
     signInWithPopup,
-    signInAnonymously,
+    signInWithRedirect,
+    getRedirectResult,
     GoogleAuthProvider,
     signOut,
     AuthError
@@ -20,6 +21,7 @@ export interface UserProfile {
     xp: number;
     streak: number;
     vipStatus: 'none' | 'adept' | 'oracle';
+    role?: 'user' | 'admin';
     lastLogin: any;
     displayName?: string;
     email?: string;
@@ -31,6 +33,7 @@ interface AuthContextType {
     profile: UserProfile | null;
     loading: boolean;
     authError: string | null;
+    isAdmin: boolean;
     login: () => Promise<void>;
     logout: () => Promise<void>;
 }
@@ -40,6 +43,7 @@ const AuthContext = createContext<AuthContextType>({
     profile: null,
     loading: true,
     authError: null,
+    isAdmin: false,
     login: async () => {},
     logout: async () => {},
 });
@@ -67,7 +71,8 @@ const ensureUserProfile = async (currentUser: User) => {
                 level: 1,
                 xp: 0,
                 streak: 1,
-                vipStatus: 'none'
+                vipStatus: 'none',
+                role: 'user'
             });
             if (analytics) logEvent(analytics, 'sign_up');
         } else {
@@ -111,6 +116,11 @@ const getAuthErrorMessage = (error: AuthError, lang: string = 'ar'): string => {
             en: 'This domain is not authorized. Check Firebase settings.',
             fr: 'Domaine non autorisé.'
         },
+        'auth/argument-error': {
+            ar: 'تعذّر بدء تسجيل Google على هذا النطاق. أضف نطاق التطبيق إلى Authorized domains في Firebase.',
+            en: 'Google sign-in cannot start on this domain. Add the app domain to Firebase Authorized domains.',
+            fr: 'La connexion Google ne peut pas démarrer sur ce domaine. Ajoutez-le aux domaines autorisés Firebase.'
+        },
     };
     const msg = messages[error.code];
     if (msg) return msg[lang] || msg['ar'];
@@ -126,6 +136,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
+    const [serverAdmin, setServerAdmin] = useState(false);
+
+    useEffect(() => {
+        fetch('/api/admin-status', { credentials: 'include' })
+            .then(response => response.ok ? response.json() : null)
+            .then(data => setServerAdmin(Boolean(data?.isAdmin)))
+            .catch(() => setServerAdmin(false));
+    }, []);
 
     // Auth state listener
     useEffect(() => {
@@ -171,37 +189,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
+    // Complete a Google redirect login after returning to the application.
+    useEffect(() => {
+        getRedirectResult(auth).catch((error: AuthError) => {
+            console.error('Google redirect result error:', error.code, error.message);
+            const lang = AppStateManager.get('lang') || 'ar';
+            setAuthError(getAuthErrorMessage(error, lang));
+        });
+    }, []);
+
     const login = async () => {
         setAuthError(null);
         const lang = AppStateManager.get('lang') || 'ar';
         try {
-            const isCapacitor = typeof (window as any).Capacitor !== 'undefined';
-            if (isCapacitor) {
-                // In Capacitor, Google Login via Popup/Redirect is restricted by the platform.
-                // Offer Guest (Anonymous) Login directly to let them use the app immediately.
-                const confirmGuest = window.confirm(
-                    lang === 'ar'
-                        ? 'تسجيل الدخول باستخدام جوجل غير مدعوم حالياً على الهاتف. هل تريد الدخول كزائر لتجربة التطبيق؟'
-                        : 'Google Login is not supported on mobile. Would you like to log in as a Guest to try the app?'
-                );
-                if (confirmGuest) {
-                    await signInAnonymously(auth);
-                    return;
-                }
-            }
             await signInWithPopup(auth, provider);
             if (analytics) logEvent(analytics, 'login', { method: 'google' });
         } catch (error) {
             const authErr = error as AuthError;
             console.error('Login error:', authErr);
-            // Automatic fallback to Anonymous login if Google popup fails
-            try {
-                console.log('Attempting anonymous fallback...');
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error('Anonymous login fallback failed:', anonError);
-                setAuthError(getAuthErrorMessage(authErr));
+            const redirectCodes = new Set([
+                'auth/popup-blocked',
+                'auth/operation-not-supported-in-this-environment',
+                'auth/argument-error'
+            ]);
+            if (redirectCodes.has(authErr.code)) {
+                try {
+                    await signInWithRedirect(auth, provider);
+                    return;
+                } catch (redirectError) {
+                    const finalError = redirectError as AuthError;
+                    console.error('Google redirect start error:', finalError.code, finalError.message);
+                    setAuthError(getAuthErrorMessage(finalError, lang));
+                    return;
+                }
             }
+            setAuthError(getAuthErrorMessage(authErr, lang));
         }
     };
 
@@ -215,7 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, profile, loading, authError, login, logout }}>
+        <AuthContext.Provider value={{ user, profile, loading, authError, isAdmin: serverAdmin || profile?.role === 'admin', login, logout }}>
             {children}
         </AuthContext.Provider>
     );
