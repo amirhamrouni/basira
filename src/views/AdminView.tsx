@@ -1,105 +1,29 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Users, BrainCircuit, LineChart, BellRing, UserCircle } from 'lucide-react';
-import DashboardModule from './admin/DashboardModule';
-import UsersModule from './admin/UsersModule';
-import AICoreModule from './admin/AICoreModule';
-import MonetizationModule from './admin/MonetizationModule';
-import ContentModule from './admin/ContentModule';
-import { cn } from '../utils/cn';
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Activity, BrainCircuit, CheckCircle2, Database, RefreshCw, Save, ShieldCheck, Users, XCircle } from 'lucide-react';
 
-export default function AdminView({ t, adminPrompt, setAdminPrompt }: any) {
-    const [activeModule, setActiveModule] = useState<'dashboard' | 'users' | 'ai_core' | 'revenue' | 'content'>('dashboard');
+type AdminData = { isAdmin: boolean; databaseReady: boolean; ai?: { openai: boolean; gemini: boolean }; metrics?: { totalReadings: number; successRate: number }; recent?: Array<{ kind: string; provider: string; success: number | boolean; durationMs: number; createdAt: number }>; settings?: Record<string, unknown> };
 
-    const modules = [
-        { id: 'dashboard', label: t.dashboard || 'Dashboard', icon: LineChart },
-        { id: 'users', label: t.users || 'Users', icon: Users },
-        { id: 'ai_core', label: t.aiCore || 'AI & Core', icon: BrainCircuit },
-        { id: 'revenue', label: t.revenue || 'Economy', icon: Settings },
-        { id: 'content', label: t.content || 'Content', icon: BellRing },
-    ] as const;
-
-    return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 w-full h-full pb-10">
-            {/* OS Header */}
-            <div className="flex items-center justify-between mb-2 px-2 border-b border-gray-200 pb-4">
-                <div className="flex items-center gap-3">
-                    <div className="relative p-2.5 bg-stella-gold/10 rounded-xl border border-stella-gold/20 shadow-sm">
-                        <div className="absolute inset-0 bg-stella-gold/5 animate-pulse rounded-xl" />
-                        <BrainCircuit className="w-6 h-6 text-stella-gold relative z-10" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-800 font-mono tracking-tight flex items-center gap-2">
-                            OS_NEXUS
-                        </h2>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            <div className="flex items-center gap-1">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                <span className="text-[9px] text-green-600 font-mono tracking-widest uppercase">Live</span>
-                            </div>
-                            <span className="text-[9px] text-gray-500 font-mono tracking-widest uppercase">v3.0.4-edge</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                    <div className="flex flex-col items-end">
-                        <span className="text-[10px] text-gray-500 font-mono">SYS_LOAD</span>
-                        <span className="text-xs text-stella-gold font-mono font-bold">42%</span>
-                    </div>
-                    <div className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center">
-                        <UserCircle className="w-5 h-5 text-gray-500" />
-                    </div>
-                </div>
-            </div>
-
-            {/* Navigation Tabs (Scrollable) */}
-            <div className="flex overflow-x-auto scrollbar-hide gap-2 px-2 pb-2">
-                {modules.map((mod) => {
-                    const Icon = mod.icon;
-                    const isActive = activeModule === mod.id;
-                    return (
-                        <button
-                            key={mod.id}
-                            onClick={() => setActiveModule(mod.id)}
-                            className={cn(
-                                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap border",
-                                isActive 
-                                    ? "bg-stella-gold/15 border-stella-gold/30 text-stella-gold shadow-sm font-bold" 
-                                    : "bg-gray-50 border-gray-200 text-gray-500 hover:text-stella-gold hover:bg-stella-gold/5"
-                            )}
-                        >
-                            <Icon className="w-4 h-4" />
-                            {mod.label}
-                        </button>
-                    );
-                })}
-            </div>
-
-            {/* Module Content */}
-            <div className="flex-1 w-full relative min-h-[500px]">
-                <AnimatePresence mode="wait">
-                    <motion.div 
-                        key={activeModule}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full h-full"
-                    >
-                        {activeModule === 'dashboard' && <DashboardModule />}
-                        {activeModule === 'users' && <UsersModule />}
-                        {activeModule === 'ai_core' && (
-                            <AICoreModule 
-                                adminPrompt={adminPrompt} 
-                                setAdminPrompt={setAdminPrompt} 
-                            />
-                        )}
-                        {activeModule === 'revenue' && <MonetizationModule />}
-                        {activeModule === 'content' && <ContentModule />}
-                    </motion.div>
-                </AnimatePresence>
-            </div>
-        </motion.div>
-    );
+export default function AdminView() {
+    const [data, setData] = useState<AdminData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState('');
+    const [settings, setSettings] = useState({ reading_style: 'عميق، واضح ومترابط دون ادعاء اليقين', maintenance_message: '', daily_limit: 20, beta_mode: true });
+    const load = async () => { setLoading(true); try { const response = await fetch('/api/admin-status', { credentials: 'include' }); const next = await response.json(); setData(next); if (next.settings) setSettings(current => ({ ...current, ...next.settings })); } catch { setData(null); } finally { setLoading(false); } };
+    useEffect(() => { load(); }, []);
+    const save = async () => { setSaving(true); setMessage(''); try { const response = await fetch('/api/admin-settings', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }); if (!response.ok) throw new Error(); setMessage('تم حفظ إعدادات التشغيل بنجاح'); } catch { setMessage('تعذر الحفظ. أعد تسجيل الدخول ثم حاول مجدداً.'); } finally { setSaving(false); } };
+    if (loading) return <div className="flex min-h-[55vh] items-center justify-center"><RefreshCw className="h-8 w-8 animate-spin text-[#d7ad58]" /></div>;
+    if (!data?.isAdmin) return <div className="oracle-frame rounded-3xl p-7 text-center"><XCircle className="mx-auto h-10 w-10 text-red-400" /><h2 className="mt-3 font-amiri text-2xl font-bold text-[#f3d994]">الوصول غير مصرح</h2><p className="mt-2 text-sm text-white/60">هذه اللوحة متاحة لمالك بصيرة فقط.</p></div>;
+    const cards = [{ label: 'القراءات المسجلة', value: data.metrics?.totalReadings ?? 0, icon: Activity }, { label: 'نسبة نجاح المحرك', value: `${data.metrics?.successRate ?? 0}%`, icon: CheckCircle2 }, { label: 'قاعدة الإدارة', value: data.databaseReady ? 'متصلة' : 'غير متصلة', icon: Database }, { label: 'مرحلة التطبيق', value: settings.beta_mode ? 'Beta' : 'Production', icon: ShieldCheck }];
+    return <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 pb-10">
+        <section className="oracle-frame rounded-[28px] p-6"><div className="relative z-10 flex items-center justify-between"><div className="flex items-center gap-3"><div className="grid h-12 w-12 place-items-center rounded-full border border-[#d7ad58]/35 bg-[#d7ad58]/10"><BrainCircuit className="h-6 w-6 text-[#f3d994]" /></div><div><p className="oracle-kicker text-xs">BASIRA CONTROL</p><h1 className="oracle-title font-amiri text-3xl font-bold">لوحة المالك</h1></div></div><button onClick={load} className="rounded-xl border border-[#d7ad58]/25 p-3 text-[#d7ad58]" aria-label="تحديث"><RefreshCw className="h-5 w-5" /></button></div></section>
+        <div className="grid grid-cols-2 gap-3">{cards.map(card => { const Icon = card.icon; return <div key={card.label} className="oracle-frame rounded-2xl p-4"><Icon className="relative z-10 h-5 w-5 text-[#d7ad58]" /><p className="relative z-10 mt-3 text-xs text-white/50">{card.label}</p><strong className="relative z-10 mt-1 block text-xl text-[#f3d994]">{card.value}</strong></div>; })}</div>
+        <section className="oracle-frame rounded-3xl p-5"><h2 className="relative z-10 mb-4 flex items-center gap-2 font-amiri text-xl font-bold text-[#f3d994]"><BrainCircuit className="h-5 w-5" />حالة محركات القراءة</h2><div className="relative z-10 grid grid-cols-2 gap-3"><Engine name="Gemini" ready={Boolean(data.ai?.gemini)} /><Engine name="OpenAI" ready={Boolean(data.ai?.openai)} /></div></section>
+        <section className="oracle-frame rounded-3xl p-5"><h2 className="relative z-10 mb-4 font-amiri text-xl font-bold text-[#f3d994]">إعدادات التشغيل</h2><div className="relative z-10 space-y-4"><label className="block text-sm text-white/70">أسلوب القراءة<textarea value={settings.reading_style} onChange={e => setSettings({ ...settings, reading_style: e.target.value.slice(0, 500) })} rows={4} className="mt-2 w-full rounded-xl border p-3 leading-7" /></label><label className="block text-sm text-white/70">رسالة الصيانة<input value={settings.maintenance_message} onChange={e => setSettings({ ...settings, maintenance_message: e.target.value.slice(0, 300) })} className="mt-2 w-full rounded-xl border p-3" placeholder="تُترك فارغة عند عدم وجود صيانة" /></label><label className="block text-sm text-white/70">الحد اليومي للمستخدم<input type="number" min="1" max="200" value={settings.daily_limit} onChange={e => setSettings({ ...settings, daily_limit: Number(e.target.value) })} className="mt-2 w-full rounded-xl border p-3" /></label><label className="flex items-center justify-between rounded-xl border border-[#d7ad58]/20 bg-black/20 p-4 text-sm"><span>وضع Beta</span><input type="checkbox" checked={settings.beta_mode} onChange={e => setSettings({ ...settings, beta_mode: e.target.checked })} className="h-5 w-5 accent-[#d7ad58]" /></label><button onClick={save} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#d7ad58] py-4 font-bold text-[#0a0710] disabled:opacity-50">{saving ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}حفظ الإعدادات</button>{message && <p className="text-center text-sm text-[#f3d994]">{message}</p>}</div></section>
+        <section className="oracle-frame rounded-3xl p-5"><h2 className="relative z-10 mb-4 flex items-center gap-2 font-amiri text-xl font-bold text-[#f3d994]"><Activity className="h-5 w-5" />آخر عمليات القراءة</h2><div className="relative z-10 space-y-2">{data.recent?.length ? data.recent.map((event, index) => <div key={`${event.createdAt}-${index}`} className="flex items-center justify-between rounded-xl border border-[#d7ad58]/15 bg-black/20 p-3"><div><strong className="block text-sm text-white/85">{event.kind}</strong><span className="text-xs text-white/40">{event.provider} · {event.durationMs}ms</span></div>{event.success ? <CheckCircle2 className="h-5 w-5 text-emerald-400" /> : <XCircle className="h-5 w-5 text-amber-400" />}</div>) : <p className="py-5 text-center text-sm text-white/45">ستظهر البيانات الحقيقية بعد تنفيذ القراءات الجديدة.</p>}</div></section>
+        <section className="oracle-frame rounded-3xl p-5"><div className="relative z-10 flex items-start gap-3"><Users className="mt-1 h-5 w-5 text-[#d7ad58]" /><div><h2 className="font-amiri text-xl font-bold text-[#f3d994]">إدارة المستخدمين</h2><p className="mt-1 text-sm leading-7 text-white/55">بيانات المستخدمين محمية داخل Firebase. سنربط هذه الوحدة بعد تثبيت صلاحية Firebase Admin من الخادم؛ لن أعرض أرقاماً أو مستخدمين وهميين.</p></div></div></section>
+    </motion.div>;
 }
+
+function Engine({ name, ready }: { name: string; ready: boolean }) { return <div className="rounded-xl border border-[#d7ad58]/15 bg-black/20 p-4"><div className="flex items-center justify-between"><strong>{name}</strong><span className={`h-2.5 w-2.5 rounded-full ${ready ? 'bg-emerald-400' : 'bg-red-400'}`} /></div><p className="mt-2 text-xs text-white/45">{ready ? 'مهيأ للعمل' : 'المفتاح غير مهيأ'}</p></div>; }
