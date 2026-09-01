@@ -7,6 +7,7 @@ import ZodiacWheel from '../components/ZodiacWheel';
 import { getApiUrl } from '../utils/api';
 import { AppStateManager } from '../utils/AppStateManager';
 import { fetchWithTimeout, getFallback } from '../utils/fetchWithTimeout';
+import AstrologyStudio from '../components/AstrologyStudio';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,6 @@ export default function ZodiacView({ t, lang }: { t: any; lang: 'ar' | 'en' | 'f
     const [dynamicDaily, setDynamicDaily] = useState<string | null>(null);
     const [isLoadingDaily, setIsLoadingDaily] = useState(false);
     const [dailyError, setDailyError] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
 
     const selectedZodiac = horoscopeData.find(z => z.id === selectedZodiacId);
 
@@ -204,7 +204,6 @@ export default function ZodiacView({ t, lang }: { t: any; lang: 'ar' | 'en' | 'f
                             {dailyError && !isLoadingDaily && (
                                 <button
                                     onClick={() => {
-                                        setRetryCount(c => c + 1);
                                         fetchDailyReading(selectedZodiacId!, true);
                                     }}
                                     className="flex items-center gap-1.5 text-xs text-stella-gold hover:text-stella-amber transition-colors font-tajawal"
@@ -339,6 +338,7 @@ export default function ZodiacView({ t, lang }: { t: any; lang: 'ar' | 'en' | 'f
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col gap-6 w-full pb-10 min-h-screen"
         >
+            <AstrologyStudio lang={lang} />
             <div className="w-full h-48 -mt-4 mb-2 relative rounded-b-[40px] overflow-hidden shadow-md">
                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1532968961962-810cb25f1eb6?q=80&w=800&auto=format&fit=crop')] bg-cover bg-center opacity-80" />
                 <div className="absolute inset-0 bg-gradient-to-t from-white via-white/80 to-transparent" />
