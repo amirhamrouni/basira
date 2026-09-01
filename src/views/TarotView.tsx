@@ -1,240 +1,102 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { UserChronosMatrix } from '../utils/contextCollector';
+import { BookOpen, RotateCcw, Send, Sparkles } from 'lucide-react';
+import { tarotDeck, TarotCard } from '../data/tarotDeck';
 import { getApiUrl } from '../utils/api';
-import CosmicRewardModal from '../components/CosmicRewardModal';
-import { Sparkles } from 'lucide-react';
-import { useAuth } from '../components/AuthProvider';
-import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
-export default function TarotView({ t, adminPrompt, lang, state, setState }: any) {
-    const { drawnCards, reading, isLoading, sessionCards, lastDrawTime } = state;
-    const [showRewardModal, setShowRewardModal] = useState(false);
-    const [rewardClaimed, setRewardClaimed] = useState(false);
-    const { user } = useAuth();
+export default function TarotView({ lang, state, setState }: any) {
+    const { drawnCards, reading, isLoading, sessionCards } = state;
+    const [question, setQuestion] = useState('');
+    const isAr = lang === 'ar';
+    const illustratedDeck = useMemo(() => tarotDeck.filter(card => card.arcana === 'major'), []);
 
-    const saveResult = async (resultText: string) => {
-        if (!user) return;
-        try {
-            await addDoc(collection(db, `users/${user.uid}/readings`), {
-                userId: user.uid,
-                type: 'tarot',
-                result: resultText,
-                createdAt: new Date().toISOString()
-            });
-        } catch(e) {
-            console.error("Failed to save reading", e);
-        }
-    };
-
-    // 78 standard tarot cards with a mix of Major and Minor Arcana for visuals
-    const cardImagesBase = [
-        "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg", 
-        "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_06_Lovers.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg"
-    ];
-
-    // Maintain stable random cards for this session across view switches
     useEffect(() => {
-        if (!sessionCards || sessionCards.length === 0) {
-            const shuffled = [...cardImagesBase].sort(() => 0.5 - Math.random());
-            setState({ ...state, sessionCards: shuffled.slice(0, 3) });
+        if (!sessionCards?.length) {
+            const shuffled = [...illustratedDeck].sort(() => Math.random() - 0.5).slice(0, 3).map(card => card.id);
+            setState({ ...state, sessionCards: shuffled, drawnCards: [], reading: null });
         }
     }, []);
 
-    const isRateLimited = () => {
-        if (lastDrawTime) {
-            const hoursPassed = (Date.now() - lastDrawTime) / (1000 * 60 * 60);
-            return hoursPassed < 12; // 12 hour cooldown
-        }
-        return false;
-    };
+    const cards = useMemo(() => sessionCards.map((id: string) => tarotDeck.find(card => card.id === id)).filter(Boolean) as TarotCard[], [sessionCards]);
 
-    const drawNext = () => {
-        if (drawnCards.length === 0 && isRateLimited()) {
+    const draw = async () => {
+        if (drawnCards.length < 2) {
+            setState({ ...state, drawnCards: [...drawnCards, drawnCards.length] });
             return;
         }
-
-        if (drawnCards.length < 3) {
-            const nextCards = [...drawnCards, drawnCards.length];
-            setState({ ...state, drawnCards: nextCards });
-            if (nextCards.length === 3) {
-                generateReading(nextCards);
-            }
+        const allDrawn = [0, 1, 2];
+        setState({ ...state, drawnCards: allDrawn, isLoading: true, reading: null });
+        const selected = cards.map((card, index) => ({ position: ['past', 'present', 'direction'][index], name: card.name, nameAr: card.nameAr, theme: card.theme, reflection: card.reflection }));
+        try {
+            const response = await fetchWithTimeout(getApiUrl('/api/tarot'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cards: selected, question, lang })
+            });
+            const data = await response.json();
+            setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: data.reply || buildLocalReading(cards, question, isAr) });
+        } catch {
+            setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: buildLocalReading(cards, question, isAr) });
         }
     };
 
-    const generateReading = async (nextCards: number[]) => {
-        setState({ ...state, drawnCards: nextCards, isLoading: true });
-        try {
-            const deviceData = UserChronosMatrix.fingerprint;
-            const res = await fetch(getApiUrl('/api/chat'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    context: `${adminPrompt}\nDevice: \n${deviceData}`,
-                    prompt: `The user focused deeply and drew 3 Tarot cards representing Past, Present, and Future. Provide a highly mystical, powerful, and flowing reading connecting the three in ${lang === 'ar' ? 'Arabic' : 'English'}. Act as an elite, deeply perceptive, human-like Chaldæan mystic. Speak in elegant, accessible, down-to-earth ${lang === 'ar' ? 'Arabic' : 'English'}. Completely ban all mechanical or automated framing sentences (e.g., avoid "حسب علم التنجيم", "أنا نموذج ذكاء اصطناعي", "بناءً على المعطيات"). Force yourself to naturally reference the user's hidden environment context within the first two sentences of the response text (e.g., "أرى في طالعك وفي هذه الساعة المتقدمة من ليل الجمعة، أن..."). Anchor predictions on realistic, profound, and deeply resonant human experiences to execute a flawless Barnum effect. Reference their exact time and environment seamlessly: ${deviceData}.`
-                })
-            });
-            const data = await res.json();
-            const generatedReading = data.reply || (lang === 'ar' ? "فشلت قراءة الطالع، يبدو أن الأرواح ترفض التحدث الآن." : "Failed to read fortunes, the spirits refuse to speak now.");
-            setState({ ...state, reading: generatedReading, isLoading: false, lastDrawTime: Date.now() });
-            saveResult(generatedReading);
-        } catch (err) {
-            setState({ ...state, reading: lang === 'ar' ? "انقطع الاتصال الكوني." : "Cosmic connection severed.", isLoading: false });
-        }
+    const reset = () => {
+        const shuffled = [...illustratedDeck].sort(() => Math.random() - 0.5).slice(0, 3).map(card => card.id);
+        setState({ ...state, sessionCards: shuffled, drawnCards: [], reading: null });
     };
 
     return (
-        <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col items-center w-full pb-8">
-            
-            <div className="w-full h-48 -mt-4 mb-8 relative rounded-b-[40px] overflow-hidden shadow-md">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1633519826330-819777174db2?q=80&w=800&auto=format&fit=crop')] bg-cover bg-center opacity-85"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/80 to-transparent"></div>
-                <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center z-10">
-                    <h2 className="text-4xl font-bold text-stella-gold mb-2 text-center drop-shadow-sm font-amiri tracking-wide">
-                        {t.tarot}
-                    </h2>
-                </div>
-            </div>
-            
-            {drawnCards.length === 0 && isRateLimited() ? (
-                <div className="glass-surface p-6 border-red-200 bg-red-50 text-center mb-4 mt-6 rounded-[24px]">
-                    <h3 className="text-red-600 font-bold mb-2 font-amiri text-xl tracking-wide">{t.tarotLimitTitle}</h3>
-                    <p className="text-gray-600 font-tajawal text-sm leading-relaxed">{t.tarotLimit}</p>
-                </div>
-            ) : (
-                <p className="text-gray-600 text-sm text-center mb-10 w-11/12 leading-relaxed font-tajawal">
-                    {t.tarotInstruction}
-                </p>
-            )}
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-10">
+            <section className="oracle-frame rounded-[28px] p-7 text-white">
+                <div className="absolute right-6 top-5 text-6xl text-[#d9b96e]/10">✦</div>
+                <p className="text-[10px] font-bold uppercase tracking-[.28em] text-[#d9b96e]">RIDER–WAITE–SMITH • MAJOR ARCANA</p>
+                <h2 className="oracle-title mt-3 font-amiri text-4xl font-bold">{isAr ? 'أسرار التاروت' : 'Tarot Secrets'}</h2>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-white/65">{isAr ? 'قراءة رمزية للسؤال والماضي والحاضر والاتجاه القادم—ليست حكماً على المستقبل.' : 'A symbolic past, present and direction reading grounded in your real question.'}</p>
+            </section>
 
-            {/* Deck Area */}
-            <div className={`flex justify-center gap-4 w-full max-w-[380px] mb-12 h-[200px] perspective-[1200px] ${(drawnCards.length === 0 && isRateLimited()) ? 'opacity-50 pointer-events-none' : ''}`}>
-                {[0, 1, 2].map((idx) => {
-                    const isDrawn = drawnCards.includes(idx);
+            <section className="oracle-frame rounded-[24px] p-5">
+                <label className="mb-3 block text-sm font-bold text-[#f3d994]">{isAr ? 'ما السر الذي تريد كشفه؟' : 'What do you want to uncover?'}</label>
+                <div className="flex gap-2">
+                    <input value={question} onChange={event => setQuestion(event.target.value.slice(0, 300))} placeholder={isAr ? 'العلاقة، العمل، قرار يشغلك...' : 'A relationship, work, or a decision...'} className="min-w-0 flex-1 rounded-2xl border border-purple-100 bg-[#fbf9fc] px-4 py-3 text-sm outline-none focus:border-purple-300" />
+                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#291d3a] text-[#d9b96e]"><Send className="h-4 w-4" /></div>
+                </div>
+            </section>
+
+            <div className="grid grid-cols-3 gap-3 px-1">
+                {cards.map((card, index) => {
+                    const revealed = drawnCards.includes(index);
                     return (
-                        <motion.div 
-                            key={idx}
-                            layout
-                            className="relative w-[30%] h-full preserve-3d cursor-pointer"
-                            onClick={() => {
-                                if (drawnCards.length === idx && drawnCards.length < 3 && !isLoading) drawNext();
-                            }}
-                            animate={{ 
-                                rotateY: isDrawn ? 180 : 0,
-                                y: isDrawn ? 0 : [0, -10, 0],
-                                scale: isDrawn ? 1.05 : 1
-                            }}
-                            transition={{ 
-                                duration: 1, 
-                                y: { repeat: Infinity, duration: 3, delay: idx * 0.4, ease: "easeInOut" }
-                            }}
-                        >
-                            {/* Card Back */}
-                            <div className="absolute inset-0 backface-hidden bg-[url('https://images.unsplash.com/photo-1550596334-7bb40a71b6ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80')] bg-cover bg-center rounded-[20px] border-2 border-stella-gold/50 shadow-md overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-to-t from-stella-gold/20 to-transparent"></div>
-                                {drawnCards.length === idx && !isLoading && <div className="absolute inset-0 bg-stella-gold/10 animate-pulse-slow"></div>}
-                            </div>
-                            
-                            {/* Card Front */}
-                            <div className="absolute inset-0 backface-hidden [transform:rotateY(180deg)] rounded-[20px] overflow-hidden border-[3px] border-stella-gold shadow-md bg-black">
-                                <img src={sessionCards[idx]} className="w-full h-full object-cover opacity-90" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent mix-blend-multiply pointer-events-none"></div>
-                            </div>
-                        </motion.div>
-                    )
+                        <motion.button key={card.id} onClick={() => index === drawnCards.length && !isLoading && draw()} animate={{ y: revealed ? 0 : [0, -6, 0] }} transition={{ y: { repeat: Infinity, duration: 3, delay: index * .25 } }} className="relative aspect-[.62] [perspective:900px]">
+                            <motion.div animate={{ rotateY: revealed ? 180 : 0 }} transition={{ duration: .8 }} className="relative h-full w-full [transform-style:preserve-3d]">
+                                <div className="absolute inset-0 grid place-items-center overflow-hidden rounded-[18px] border border-[#d9b96e]/50 bg-[radial-gradient(circle,#654c7e,#171020_68%)] shadow-xl [backface-visibility:hidden]">
+                                    <div className="absolute inset-2 rounded-[13px] border border-[#d9b96e]/25" />
+                                    <span className="text-4xl text-[#d9b96e]">✦</span>
+                                </div>
+                                <div className="absolute inset-0 flex flex-col items-center justify-between rounded-[18px] border-2 border-[#d9b96e] bg-gradient-to-b from-[#fff8e8] to-[#ead9b8] p-3 text-center shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#6d5731]">{['الماضي','الحاضر','الاتجاه'][index]}</span>
+                                    {card.imageUrl ? <img src={card.imageUrl} alt={isAr ? card.nameAr : card.name} className="absolute inset-1 h-[calc(100%-8px)] w-[calc(100%-8px)] rounded-[14px] object-cover" /> : <span className="text-5xl text-[#382747]">{card.symbol}</span>}
+                                    <div className="absolute inset-x-1 bottom-1 rounded-b-[13px] bg-gradient-to-t from-black/90 to-transparent px-2 pb-2 pt-8 text-white">
+                                        <strong className="block font-amiri text-xs">{isAr ? card.nameAr : card.name}</strong>
+                                        <span className="block text-[8px] text-white/75">{card.theme}</span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.button>
+                    );
                 })}
             </div>
 
-            {drawnCards.length < 3 && !isLoading && (
-                <button 
-                    onClick={drawNext} 
-                    className="bg-stella-gold text-white font-bold py-4 px-14 rounded-full shadow-md hover:bg-stella-amber hover:scale-105 transition-all duration-300 text-lg tracking-widest font-amiri uppercase"
-                >
-                    {t.tarotDrawBtn} <span className="opacity-90 font-sans tracking-normal ml-2">({drawnCards.length}/3)</span>
-                </button>
-            )}
+            {!reading && <button onClick={draw} disabled={isLoading || cards.length < 3} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2a1c3b] to-[#78546f] py-4 font-bold text-white shadow-lg disabled:opacity-50"><Sparkles className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />{isLoading ? (isAr ? 'تُنسج القراءة...' : 'Weaving the reading...') : (isAr ? `اكشف البطاقة ${Math.min(drawnCards.length + 1, 3)}` : `Reveal card ${Math.min(drawnCards.length + 1, 3)}`)}</button>}
 
-            {isLoading && (
-                <div className="text-stella-gold text-lg font-amiri font-bold animate-pulse tracking-widest mt-4">
-                    {t.readingLoading}
-                </div>
-            )}
+            {reading && <motion.section initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="oracle-frame rounded-[26px] p-6"><div className="mb-4 flex items-center gap-2 text-[#f3d994]"><Sparkles className="h-5 w-5" /><h3 className="font-amiri text-2xl font-bold">{isAr ? 'ما تكشفه البطاقات' : 'What the cards reveal'}</h3></div><p className="whitespace-pre-line text-[15px] leading-8 text-[#e8dfeb]">{reading}</p><button onClick={reset} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-[#d9b96e]/30 py-3 text-sm font-bold text-[#d9b96e]"><RotateCcw className="h-4 w-4" />{isAr ? 'قراءة جديدة' : 'New reading'}</button></motion.section>}
 
-            {reading && (
-                <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1 }} className="w-full mt-6 mb-6">
-                    <div className="glass-card p-8 bg-white border border-gray-100 shadow-sm relative overflow-hidden rounded-[32px]">
-                        <div className="absolute -top-10 -left-10 w-48 h-48 bg-stella-gold/5 rounded-full blur-[50px] animate-pulse-slow"></div>
-                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-stella-amber/5 rounded-full blur-[40px]"></div>
-                        <p className="text-gray-700 text-base md:text-lg leading-[2.4] whitespace-pre-wrap font-tajawal relative z-10 text-justify">
-                            {reading}
-                        </p>
-                        <button 
-                            onClick={() => {
-                                const shuffled = [...cardImagesBase].sort(() => 0.5 - Math.random());
-                                setState({ ...state, drawnCards: [], reading: null, sessionCards: shuffled.slice(0, 3) });
-                                setRewardClaimed(false);
-                            }}
-                            className="w-full mt-6 border border-gray-200 text-gray-500 font-bold py-3.5 rounded-xl hover:bg-gray-50 hover:text-stella-gold transition-all duration-300 text-sm font-amiri tracking-wide"
-                        >
-                            {lang === 'ar' ? 'سحب أوراق جديدة' : 'Draw New Cards'}
-                        </button>
-
-                        {!rewardClaimed && (
-                            <motion.button
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                onClick={() => setShowRewardModal(true)}
-                                className="w-full mt-4 bg-stella-gold/10 border border-stella-gold/30 text-stella-gold py-4 rounded-xl hover:bg-stella-gold/20 hover:shadow-sm transition-all flex items-center justify-center gap-2 group"
-                            >
-                                <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                <span className="font-bold text-sm tracking-widest font-amiri uppercase">
-                                    {lang === 'ar' ? 'افتح السر الكوني' : 'Unlock Cosmic Secret'}
-                                </span>
-                            </motion.button>
-                        )}
-                        
-                        {rewardClaimed && (
-                            <motion.div 
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                className="mt-6 p-5 rounded-2xl border border-stella-gold/20 bg-stella-gold/5 shadow-sm"
-                            >
-                                <h4 className="text-stella-gold font-bold font-amiri mb-2 flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4" /> 
-                                    {lang === 'ar' ? 'الرسالة المخفية' : 'The Hidden Message'}
-                                </h4>
-                                <p className="text-gray-600 text-sm leading-relaxed font-tajawal">
-                                    {lang === 'ar' 
-                                        ? 'النجوم تهمس بأن هناك طاقة غير مرئية تحميك هذا الأسبوع. ثق بحدسك، فهو بوابتك لفرصة عظيمة قادمة.' 
-                                        : 'The stars whisper of an unseen energy protecting you this week. Trust your intuition entirely; it is the gateway to an upcoming grand opportunity.'}
-                                </p>
-                            </motion.div>
-                        )}
-                    </div>
-                </motion.div>
-            )}
-
-            <CosmicRewardModal 
-                isOpen={showRewardModal}
-                onClose={() => setShowRewardModal(false)}
-                onRewardComplete={() => {
-                    setRewardClaimed(true);
-                }}
-                lang={lang}
-                rewardType="insight"
-                title={lang === 'ar' ? 'السر الكوني' : 'The Cosmic Secret'}
-                description={lang === 'ar' ? 'قدم جزءاً من طاقتك لكشف رسالة مصيرية مخفية في قراءتك الحالية.' : 'Offer a fragment of your energy to reveal a hidden destiny message within your current reading.'}
-            />
+            <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-[11px] leading-5 text-gray-500"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" /><p>{isAr ? 'صور Rider–Waite–Smith الأصلية (Pamela Colman Smith، 1910) من Wikimedia Commons. المعاني مستندة إلى The Pictorial Key to the Tarot وتُستخدم للتأمل، لا للتنبؤ.' : 'Original Rider–Waite–Smith art (Pamela Colman Smith, 1910) via Wikimedia Commons. Meanings reference The Pictorial Key and are for reflection, not prediction.'} <a className="font-bold text-purple-700 underline" href="https://commons.wikimedia.org/wiki/Category:Rider-Waite_tarot_deck" target="_blank" rel="noreferrer">{isAr ? 'المصدر' : 'Source'}</a></p></div>
         </motion.div>
     );
+}
+
+function buildLocalReading(cards: TarotCard[], question: string, isAr: boolean) {
+    if (!isAr) return cards.map((card, i) => `${['Past','Present','Direction'][i]} — ${card.name}: ${card.reflection}.`).join('\n\n') + `\n\nReflect on what small action is supported by these themes${question ? ` in relation to “${question}”` : ''}.`;
+    return cards.map((card, i) => `${['الماضي','الحاضر','الاتجاه'][i]} — ${card.nameAr}: ${card.reflection}.`).join('\n\n') + `\n\nالخلاصة: لا تخبرك البطاقات بما سيحدث؛ هي تجمع ثلاث زوايا تساعدك على سؤال نفسك: ما الخطوة الصغيرة التي تنسجم مع هذه المعاني${question ? ` في موضوع «${question}»` : ''}؟`;
 }
