@@ -8,8 +8,19 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 export default function TarotView({ lang, state, setState }: any) {
     const { drawnCards, reading, isLoading, sessionCards } = state;
     const [question, setQuestion] = useState('');
+    const [spreadId, setSpreadId] = useState('past-present-direction');
     const isAr = lang === 'ar';
     const illustratedDeck = useMemo(() => tarotDeck.filter(card => card.arcana === 'major'), []);
+    const spreads = isAr ? [
+        { id: 'past-present-direction', name: 'الماضي • الحاضر • الاتجاه', positions: ['الماضي المؤثر', 'ما يجري الآن', 'الاتجاه القادم'] },
+        { id: 'problem-cause-solution', name: 'المشكلة • السبب • المفتاح', positions: ['العقدة الظاهرة', 'السبب الخفي', 'مفتاح الحل'] },
+        { id: 'relationship-mirror', name: 'مرآة العلاقة', positions: ['طاقتك في العلاقة', 'طاقة الطرف الآخر المحتملة', 'مسار العلاقة'] },
+    ] : [
+        { id: 'past-present-direction', name: 'Past • Present • Direction', positions: ['Influential past', 'What is unfolding', 'Likely direction'] },
+        { id: 'problem-cause-solution', name: 'Problem • Cause • Key', positions: ['Visible knot', 'Hidden cause', 'Key to resolution'] },
+        { id: 'relationship-mirror', name: 'Relationship Mirror', positions: ['Your energy', 'Their possible energy', 'Relationship path'] },
+    ];
+    const activeSpread = spreads.find(spread => spread.id === spreadId) || spreads[0];
 
     useEffect(() => {
         if (!sessionCards?.length) {
@@ -27,12 +38,12 @@ export default function TarotView({ lang, state, setState }: any) {
         }
         const allDrawn = [0, 1, 2];
         setState({ ...state, drawnCards: allDrawn, isLoading: true, reading: null });
-        const selected = cards.map((card, index) => ({ position: ['past', 'present', 'direction'][index], name: card.name, nameAr: card.nameAr, theme: card.theme, reflection: card.reflection }));
+        const selected = cards.map((card, index) => ({ position: activeSpread.positions[index], name: card.name, nameAr: card.nameAr, theme: card.theme, reflection: card.reflection }));
         try {
             const response = await fetchWithTimeout(getApiUrl('/api/tarot'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cards: selected, question, lang })
+                body: JSON.stringify({ cards: selected, question, lang, spreadName: activeSpread.name, positions: activeSpread.positions })
             });
             const data = await response.json();
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: data.reply || buildLocalReading(cards, question, isAr) });
@@ -61,6 +72,13 @@ export default function TarotView({ lang, state, setState }: any) {
                     <input value={question} onChange={event => setQuestion(event.target.value.slice(0, 300))} placeholder={isAr ? 'العلاقة، العمل، قرار يشغلك...' : 'A relationship, work, or a decision...'} className="min-w-0 flex-1 rounded-2xl border border-purple-100 bg-[#fbf9fc] px-4 py-3 text-sm outline-none focus:border-purple-300" />
                     <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#291d3a] text-[#d9b96e]"><Send className="h-4 w-4" /></div>
                 </div>
+                <div className="mt-4 grid grid-cols-3 gap-2" role="radiogroup" aria-label={isAr ? 'اختر نوع القراءة' : 'Choose a spread'}>
+                    {spreads.map(spread => (
+                        <button key={spread.id} type="button" role="radio" aria-checked={spreadId === spread.id} onClick={() => { setSpreadId(spread.id); if (drawnCards.length || reading) reset(); }} className={`min-h-14 rounded-xl border px-2 py-2 text-xs leading-5 transition ${spreadId === spread.id ? 'border-[#d9b96e] bg-[#d9b96e]/15 text-[#f3d994]' : 'border-[#d9b96e]/20 bg-black/20 text-white/60 hover:border-[#d9b96e]/50'}`}>
+                            {spread.name}
+                        </button>
+                    ))}
+                </div>
             </section>
 
             <div className="grid grid-cols-3 gap-3 px-1">
@@ -74,7 +92,7 @@ export default function TarotView({ lang, state, setState }: any) {
                                     <span className="text-4xl text-[#d9b96e]">✦</span>
                                 </div>
                                 <div className="absolute inset-0 flex flex-col items-center justify-between rounded-[18px] border-2 border-[#d9b96e] bg-gradient-to-b from-[#fff8e8] to-[#ead9b8] p-3 text-center shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#6d5731]">{['الماضي','الحاضر','الاتجاه'][index]}</span>
+                                    <span className="relative z-10 rounded bg-[#fff8e8]/90 px-1.5 py-0.5 text-[10px] font-bold text-[#6d5731]">{activeSpread.positions[index]}</span>
                                     {card.imageUrl ? <img src={card.imageUrl} alt={isAr ? card.nameAr : card.name} className="absolute inset-1 h-[calc(100%-8px)] w-[calc(100%-8px)] rounded-[14px] object-cover" /> : <span className="text-5xl text-[#382747]">{card.symbol}</span>}
                                     <div className="absolute inset-x-1 bottom-1 rounded-b-[13px] bg-gradient-to-t from-black/90 to-transparent px-2 pb-2 pt-8 text-white">
                                         <strong className="block font-amiri text-xs">{isAr ? card.nameAr : card.name}</strong>
