@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Moon, Star, Quote, RefreshCw, AlertCircle } from 'lucide-react';
+import { Sparkles, Moon, Star, Quote } from 'lucide-react';
 import { horoscopeData } from '../data/horoscopeData';
 import { requestPermission, scheduleDaily } from '../utils/notifications';
 import { getApiUrl } from '../utils/api';
 import { AppStateManager } from '../utils/AppStateManager';
 import { fetchWithTimeout, getFallback } from '../utils/fetchWithTimeout';
+import { Body, Illumination, MoonPhase } from 'astronomy-engine';
 
 export default function HomeView({ t, onNavigate, lang }: { t: any; onNavigate: (view: any) => void; lang: 'ar' | 'en' | 'fr' }) {
     const [randomWisdoms, setRandomWisdoms] = useState<string[]>([]);
@@ -18,6 +19,8 @@ export default function HomeView({ t, onNavigate, lang }: { t: any; onNavigate: 
 
     const dayIndex = new Date().getDay();
     const phaseIndex = Math.floor(Date.now() / 86400000) % 8;
+    const moonAngle = MoonPhase(new Date());
+    const moonLight = Math.round(Illumination(Body.Moon, new Date()).phase_fraction * 100);
 
     const daysList = [t.days.sun, t.days.mon, t.days.tue, t.days.wed, t.days.thu, t.days.fri, t.days.sat];
     const phasesList = [
@@ -61,7 +64,7 @@ export default function HomeView({ t, onNavigate, lang }: { t: any; onNavigate: 
     // Dynamic daily horoscope state
     const [dynamicDaily, setDynamicDaily] = useState<string | null>(null);
     const [isLoadingDaily, setIsLoadingDaily] = useState(false);
-    const [dailyError, setDailyError] = useState(false);
+    const [, setDailyError] = useState(false);
 
     useEffect(() => {
         if (!savedZodiacId) return;
@@ -107,7 +110,47 @@ export default function HomeView({ t, onNavigate, lang }: { t: any; onNavigate: 
 
     return (
         <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-6 w-full">
-            
+
+            <section className="oracle-frame rounded-[28px] p-6 text-white min-h-[430px]">
+                <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-stella-gold/20 blur-3xl" />
+                <div className="absolute left-1/2 top-20 h-56 w-56 -translate-x-1/2 rounded-full border border-[#d7ad58]/30 opacity-70">
+                    <div className="absolute inset-4 rounded-full border border-[#d7ad58]/15" />
+                    {['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'].map((sign, i) => <span key={sign} className="absolute left-1/2 top-1/2 text-xs text-[#d7ad58]/70" style={{ transform: `translate(-50%,-50%) rotate(${i * 30}deg) translateY(-102px) rotate(${-i * 30}deg)` }}>{sign}</span>)}
+                </div>
+                <div className="absolute left-1/2 top-[7.4rem] h-36 w-36 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,#fff4c9_0%,#e6c276_34%,#8d6834_68%,#2a1933_100%)] shadow-[0_0_60px_rgba(215,173,88,.28)]" />
+                <div className="relative z-10">
+                    <div className="mb-5 flex items-center justify-between">
+                        <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 backdrop-blur-xl">
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em]">BASIRA AI ONLINE</span>
+                        </div>
+                        <Sparkles className="h-6 w-6 text-stella-gold" />
+                    </div>
+                    <h2 className="oracle-title mt-56 text-center font-amiri text-4xl font-bold leading-tight">
+                        {lang === 'ar' ? 'بين النجوم تبدأ بصيرتك' : lang === 'fr' ? 'Votre vision naît parmi les étoiles' : 'Your insight begins among the stars'}
+                    </h2>
+                    <p className="mx-auto mt-2 max-w-xs text-center text-sm leading-6 text-white/65">
+                        {lang === 'ar' ? 'اختر بوابتك ودع الذكاء الاصطناعي يصنع قراءة خاصة بك.' : 'Choose a gateway for a personalized AI reflection.'}
+                    </p>
+                    <div className="mt-5 grid grid-cols-3 gap-2">
+                        {[
+                            { id: 'palmistry', icon: '🖐️', ar: 'الكف', en: 'Palm' },
+                            { id: 'tarot', icon: '🃏', ar: 'التاروت', en: 'Tarot' },
+                            { id: 'dream', icon: '🌙', ar: 'الأحلام', en: 'Dreams' }
+                        ].map(item => (
+                            <button key={item.id} onClick={() => onNavigate(item.id)} className="rounded-xl border border-[#d7ad58]/25 bg-black/25 px-2 py-3 text-center backdrop-blur-lg transition hover:-translate-y-1 hover:border-[#d7ad58]/60">
+                                <span className="block text-2xl">{item.icon}</span>
+                                <span className="mt-1 block text-[11px] font-bold">{lang === 'ar' ? item.ar : item.en}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="mt-4 flex items-center justify-between rounded-xl border border-[#d7ad58]/20 bg-black/20 px-4 py-3 text-xs text-white/65">
+                        <span>{lang === 'ar' ? 'إضاءة القمر الحقيقية' : 'Live moon illumination'}</span>
+                        <span className="font-mono font-bold text-stella-gold">{moonLight}% · {Math.round(moonAngle)}°</span>
+                    </div>
+                </div>
+            </section>
+
             {!hasPermission && (
                 <button
                     onClick={async () => {
