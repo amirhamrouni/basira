@@ -20,6 +20,8 @@ const ZodiacView = lazy(() => import('./views/ZodiacView'));
 const FaceView = lazy(() => import('./views/FaceView'));
 const OtherView = lazy(() => import('./views/OtherView'));
 const HistoryView = lazy(() => import('./views/HistoryView'));
+const DreamView = lazy(() => import('./views/DreamView'));
+const UserDashboardView = lazy(() => import('./views/UserDashboardView'));
 
 export default function App() {
     const { user, profile, login, logout, loading: authLoading, authError } = useAuth();
@@ -35,7 +37,7 @@ export default function App() {
         if (browserLang.startsWith('fr')) return 'fr';
         return browserLang.startsWith('ar') ? 'ar' : 'en';
     });
-    const [activeView, setActiveView] = useState<'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'premium' | 'zodiac' | 'other' | 'history'>('home');
+    const [activeView, setActiveView] = useState<'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream'>('home');
     const [adminPrompt, setAdminPrompt] = useState(LANGUAGE_PACK.ar.defaultPrompt);
     const [showLangMenu, setShowLangMenu] = useState(false);
     
@@ -46,6 +48,11 @@ export default function App() {
     const [coffeeState, setCoffeeState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false });
 
     const t = LANGUAGE_PACK[lang];
+    const isAdmin = profile?.role === 'admin';
+
+    useEffect(() => {
+        if (activeView === 'admin' && !isAdmin) setActiveView('home');
+    }, [activeView, isAdmin]);
 
     useEffect(() => {
         AppStateManager.set('lang', lang);
@@ -56,7 +63,7 @@ export default function App() {
     // Show full-screen loader while Firebase resolves auth state
     if (authLoading) {
         return (
-            <div className="max-w-md mx-auto w-full min-h-screen flex flex-col items-center justify-center bg-stella-bg">
+            <div className="oracle-app max-w-md mx-auto w-full min-h-screen flex flex-col items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-16 h-16 rounded-full border-[3px] border-stella-gold border-t-transparent animate-spin" />
                     <p className="text-stella-gold font-amiri text-lg">
@@ -68,10 +75,7 @@ export default function App() {
     }
 
     return (
-        <div className="max-w-md mx-auto w-full min-h-screen pb-[calc(110px+env(safe-area-inset-bottom,0px))] relative bg-stella-bg font-tajawal shadow-2xl overflow-x-hidden selection:bg-stella-gold/30 ring-1 ring-black/5 text-gray-800">
-            <div className="fixed inset-0 bg-stella-bg -z-30"></div>
-            <div className="fixed inset-0 bg-[url('https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1200&auto=format&fit=crop')] bg-cover bg-center opacity-5 -z-20 pointer-events-none"></div>
-            <div className="fixed inset-0 bg-gradient-to-b from-stella-bg/80 via-stella-bg/95 to-stella-bg -z-10 pointer-events-none"></div>
+        <div className="oracle-app max-w-md mx-auto w-full min-h-screen pb-[calc(110px+env(safe-area-inset-bottom,0px))] relative font-tajawal shadow-2xl overflow-x-hidden selection:bg-stella-gold/30 ring-1 ring-[#d7ad58]/10">
             
             {/* Auth Error Banner */}
             <AnimatePresence>
@@ -96,7 +100,7 @@ export default function App() {
                 )}
             </AnimatePresence>
 
-            <header className="flex justify-between items-center p-5 pt-[calc(1.75rem+env(safe-area-inset-top,0px))] relative z-20 bg-white/70 backdrop-blur-xl border-b border-gray-200 sticky top-0 shadow-sm">
+            <header className="flex justify-between items-center p-5 pt-[calc(1.75rem+env(safe-area-inset-top,0px))] relative z-20 bg-[#090610]/85 backdrop-blur-2xl border-b border-[#d7ad58]/20 sticky top-0 shadow-[0_12px_35px_rgba(0,0,0,.35)]">
                 <div 
                     className="flex items-center gap-4 cursor-pointer group"
                     onClick={() => {
@@ -117,7 +121,7 @@ export default function App() {
                         </div>
                     ) : (
                         <div className="w-12 h-12 rounded-full p-[2px] bg-stella-border group-hover:bg-stella-gold/30 transition-colors shadow-sm">
-                            <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                            <div className="w-full h-full rounded-full bg-[#130d20] flex items-center justify-center">
                                 <span className="text-xl opacity-50">👤</span>
                             </div>
                         </div>
@@ -126,7 +130,7 @@ export default function App() {
                         <h1 className="text-lg font-bold text-stella-gold font-amiri tracking-wide drop-shadow-sm group-hover:text-stella-amber transition-colors">
                             {user ? user.displayName || user.email?.split('@')[0] : (lang === 'ar' ? 'رحلة النور' : 'Journey of Light')}
                         </h1>
-                        <p className="text-[11px] font-tajawal text-gray-500 font-medium tracking-wider mt-0.5">
+                        <p className="text-xs font-tajawal text-[#aaa0b2] font-medium tracking-wider mt-0.5">
                             {user ? (lang === 'ar' ? `المستوى (${profile?.level || 1})` : `Level ${profile?.level || 1}`) : (lang === 'ar' ? 'انقر للبدء' : 'Click to begin')}
                         </p>
                     </div>
@@ -150,7 +154,7 @@ export default function App() {
                         {showLangMenu && (
                             <>
                                 <div className="fixed inset-0 z-30" onClick={() => setShowLangMenu(false)} />
-                                <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-150 rounded-2xl shadow-lg z-40 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="absolute right-0 mt-2 w-32 bg-[#120c1d] border border-[#d7ad58]/25 rounded-2xl shadow-lg z-40 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                                     {([
                                         { code: 'ar', label: 'العربية' },
                                         { code: 'en', label: 'English' },
@@ -197,7 +201,9 @@ export default function App() {
                             {activeView === 'notifications' && <NotificationsView key="notifications" t={t} lang={lang} />}
                             {activeView === 'other' && <OtherView key="other" t={t} lang={lang} onNavigate={setActiveView} />}
                             {activeView === 'history' && <HistoryView key="history" t={t} lang={lang} onNavigate={setActiveView} />}
-                            {activeView === 'admin' && (
+                            {activeView === 'dream' && <DreamView key="dream" lang={lang} />}
+                            {activeView === 'dashboard' && <UserDashboardView key="dashboard" lang={lang} onNavigate={setActiveView} />}
+                            {activeView === 'admin' && isAdmin && (
                                 <AdminView 
                                     key="admin" 
                                     t={t} 
