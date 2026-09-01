@@ -22,6 +22,7 @@ const OtherView = lazy(() => import('./views/OtherView'));
 const HistoryView = lazy(() => import('./views/HistoryView'));
 const DreamView = lazy(() => import('./views/DreamView'));
 const UserDashboardView = lazy(() => import('./views/UserDashboardView'));
+const PrivacyView = lazy(() => import('./views/PrivacyView'));
 
 export default function App() {
     const { user, profile, login, logout, loading: authLoading, authError, isAdmin } = useAuth();
@@ -37,7 +38,7 @@ export default function App() {
         if (browserLang.startsWith('fr')) return 'fr';
         return browserLang.startsWith('ar') ? 'ar' : 'en';
     });
-    const [activeView, setActiveView] = useState<'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream'>('home');
+    const [activeView, setActiveView] = useState<'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream' | 'privacy'>('home');
     const adminPrompt = LANGUAGE_PACK.ar.defaultPrompt;
     const [showLangMenu, setShowLangMenu] = useState(false);
     
@@ -201,6 +202,7 @@ export default function App() {
                             {activeView === 'history' && <HistoryView key="history" t={t} lang={lang} onNavigate={setActiveView} />}
                             {activeView === 'dream' && <DreamView key="dream" lang={lang} />}
                             {activeView === 'dashboard' && <UserDashboardView key="dashboard" lang={lang} onNavigate={setActiveView} />}
+                            {activeView === 'privacy' && <PrivacyView key="privacy" lang={lang} />}
                             {activeView === 'admin' && isAdmin && <AdminView key="admin" />}
                         </AnimatePresence>
                     </Suspense>
