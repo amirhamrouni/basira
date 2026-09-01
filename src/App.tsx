@@ -24,7 +24,7 @@ const DreamView = lazy(() => import('./views/DreamView'));
 const UserDashboardView = lazy(() => import('./views/UserDashboardView'));
 
 export default function App() {
-    const { user, profile, login, logout, loading: authLoading, authError } = useAuth();
+    const { user, profile, login, logout, loading: authLoading, authError, isAdmin } = useAuth();
     const [showAuthError, setShowAuthError] = useState(false);
 
     useEffect(() => {
@@ -38,7 +38,7 @@ export default function App() {
         return browserLang.startsWith('ar') ? 'ar' : 'en';
     });
     const [activeView, setActiveView] = useState<'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream'>('home');
-    const [adminPrompt, setAdminPrompt] = useState(LANGUAGE_PACK.ar.defaultPrompt);
+    const adminPrompt = LANGUAGE_PACK.ar.defaultPrompt;
     const [showLangMenu, setShowLangMenu] = useState(false);
     
     // Persistent app states
@@ -48,8 +48,6 @@ export default function App() {
     const [coffeeState, setCoffeeState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false });
 
     const t = LANGUAGE_PACK[lang];
-    const isAdmin = profile?.role === 'admin';
-
     useEffect(() => {
         if (activeView === 'admin' && !isAdmin) setActiveView('home');
     }, [activeView, isAdmin]);
@@ -203,14 +201,7 @@ export default function App() {
                             {activeView === 'history' && <HistoryView key="history" t={t} lang={lang} onNavigate={setActiveView} />}
                             {activeView === 'dream' && <DreamView key="dream" lang={lang} />}
                             {activeView === 'dashboard' && <UserDashboardView key="dashboard" lang={lang} onNavigate={setActiveView} />}
-                            {activeView === 'admin' && isAdmin && (
-                                <AdminView 
-                                    key="admin" 
-                                    t={t} 
-                                    adminPrompt={adminPrompt} 
-                                    setAdminPrompt={setAdminPrompt} 
-                                />
-                            )}
+                            {activeView === 'admin' && isAdmin && <AdminView key="admin" />}
                         </AnimatePresence>
                     </Suspense>
                 </ErrorBoundary>
