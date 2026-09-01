@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import { ScanFace, Coffee, Crown, Eye, History } from 'lucide-react';
+import { useAuth } from '../components/AuthProvider';
 
 export default function OtherView({ t, lang, onNavigate }: any) {
+    const { isAdmin } = useAuth();
     return (
         <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-6 w-full pb-10 min-h-screen">
             <div className="text-center mb-2 mt-4 px-2">
@@ -15,7 +17,7 @@ export default function OtherView({ t, lang, onNavigate }: any) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-1">
                 {/* Numerology / Divination */}
-                <motion.div 
+                {isAdmin && <motion.div
                     whileHover={{ scale: 1.02 }}
                     onClick={() => onNavigate('divination')}
                     className="glass-card p-6 border-purple-200 shadow-sm rounded-2xl cursor-pointer bg-gradient-to-br from-purple-50/50 to-white flex items-center gap-4 group hover:shadow-md transition-shadow"
@@ -27,7 +29,7 @@ export default function OtherView({ t, lang, onNavigate }: any) {
                         <h3 className="text-lg font-bold text-purple-800 font-amiri">{t.divination}</h3>
                         <p className="text-xs text-gray-500 font-tajawal mt-1">{t.features.divination}</p>
                     </div>
-                </motion.div>
+                </motion.div>}
 
                 {/* Face Reading */}
                 <motion.div 
@@ -92,15 +94,15 @@ export default function OtherView({ t, lang, onNavigate }: any) {
                 {/* System Control / Admin */}
                 <motion.div 
                     whileHover={{ scale: 1.02 }}
-                    onClick={() => onNavigate('admin')}
+                    onClick={() => onNavigate(isAdmin ? 'admin' : 'dashboard')}
                     className="glass-card p-6 border-red-200 shadow-sm rounded-2xl cursor-pointer bg-gradient-to-br from-red-50/50 to-white flex items-center gap-4 group hover:shadow-md transition-shadow"
                 >
                     <div className="w-14 h-14 rounded-full bg-red-100/50 flex items-center justify-center border border-red-200 group-hover:bg-red-100 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600 w-7 h-7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path><path d="m9 12 2 2 4-4"></path></svg>
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-red-800 font-amiri">{lang === 'ar' ? 'لوحة القيادة' : 'Admin Ecosystem'}</h3>
-                        <p className="text-xs text-gray-500 font-tajawal mt-1">{lang === 'ar' ? 'إدارة النظام والتحكم الذكي' : 'System configuration and control'}</p>
+                        <h3 className="text-lg font-bold text-red-800 font-amiri">{isAdmin ? (lang === 'ar' ? 'لوحة الإدارة' : 'Admin Ecosystem') : (lang === 'ar' ? 'لوحتي الشخصية' : 'My Dashboard')}</h3>
+                        <p className="text-xs text-gray-500 font-tajawal mt-1">{isAdmin ? (lang === 'ar' ? 'إدارة النظام والتحكم الذكي' : 'System configuration and control') : (lang === 'ar' ? 'حسابك، طاقتك وسجل قراءاتك' : 'Account, energy and reading history')}</p>
                     </div>
                 </motion.div>
             </div>
