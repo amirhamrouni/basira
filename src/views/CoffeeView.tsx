@@ -4,13 +4,12 @@ import { Coffee, CheckCircle2, Share2, Save } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
-import { UserChronosMatrix } from '../utils/contextCollector';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 export default function CoffeeView({ t, lang, state, setState }: any) {
-    const { isScanning, imagePreview, reading } = state;
+    const { isScanning, imagePreview, reading, error } = state;
     const fileRef = useRef<HTMLInputElement>(null);
     const { user } = useAuth();
 
@@ -19,9 +18,9 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
         if (file) {
             try {
                 const image = await compressReadingImage(file, 1100, 0.72);
-                setState({ ...state, imagePreview: image, reading: null, isScanning: false });
+                setState((current: any) => ({ ...current, imagePreview: image, reading: null, error: null, isScanning: false }));
             } catch {
-                setState({ ...state, imagePreview: null, reading: lang === 'ar' ? 'تعذّر تجهيز الصورة. اختر صورة JPG أو PNG واضحة وحاول مجدداً.' : 'Could not prepare this image. Choose a clear JPG or PNG image.', isScanning: false });
+                setState((current: any) => ({ ...current, imagePreview: null, reading: null, error: lang === 'ar' ? 'تعذّر تجهيز الصورة. اختر صورة JPG أو PNG واضحة وحاول مجدداً.' : 'Could not prepare this image. Choose a clear JPG or PNG image.', isScanning: false }));
             } finally {
                 e.target.value = '';
             }
@@ -44,7 +43,7 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
 
     const triggerScan = async () => {
         if (!imagePreview) return;
-        setState({ ...state, isScanning: true, reading: null });
+        setState((current: any) => ({ ...current, isScanning: true, reading: null, error: null }));
         
         try {
             const res = await fetchWithTimeout(getApiUrl('/api/coffee'), {
@@ -53,28 +52,30 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
                 body: JSON.stringify({
                     image: imagePreview,
                     lang,
-                    deviceData: UserChronosMatrix.fingerprint,
-                    readingId: crypto.randomUUID()
+                    readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`
                 })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
+                if (data.error === 'WRONG_IMAGE_TYPE') {
+                    setState((current: any) => ({ ...current, reading: null, error: data.reply || (lang === 'ar' ? 'هذه ليست صورة واضحة لداخل فنجان قهوة.' : 'This is not a clear view inside a coffee cup.'), isScanning: false }));
+                    return;
+                }
                 throw new Error(data.reply || data.error || `HTTP ${res.status}`);
             }
             
             if (data.reply && data.reply.trim() === 'ERROR_NOT_A_CUP') {
-                 setState({ ...state, reading: lang === 'ar' ? "عذراً.. هذه الصورة لا تبدو كفنجان قهوة من الداخل. لا يمكن قراءة الطالع إلا بصورة واضحة لقعر الفنجان." : "Sorry.. this does not appear to be the inside of a coffee cup. The reading requires a clear picture of coffee grounds.", isScanning: false });
+                 setState((current: any) => ({ ...current, reading: null, error: lang === 'ar' ? "عذراً.. هذه الصورة لا تبدو كفنجان قهوة من الداخل. صوّر القعر والرواسب بوضوح." : "Sorry.. this does not appear to be the inside of a coffee cup with visible grounds.", isScanning: false }));
             } else {
-                 const generatedReading = data.reply || (lang === 'ar' ? "تشويش كوني، جرب مرة أخرى." : "Cosmic disturbance, try again.");
-                 setState({ ...state, reading: generatedReading, isScanning: false });
-                 saveResult(generatedReading);
+                 const generatedReading = typeof data.reply === 'string' ? data.reply.trim() : '';
+                 if (!generatedReading) throw new Error('Empty coffee reading');
+                 setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
+                 await saveResult(generatedReading);
             }
         } catch (err) {
-             const reason = err instanceof Error ? err.message : '';
-             const message = reason && !reason.startsWith('HTTP')
-                ? reason
-                : (lang === 'ar' ? 'تعذّر تحليل الفنجان الآن. تحقق من الاتصال ثم اضغط إعادة المحاولة.' : 'The cup could not be analyzed. Check your connection and retry.');
-             setState({ ...state, reading: message, isScanning: false });
+             console.error('Coffee reading failed', err);
+             const message = lang === 'ar' ? 'تعذّر تحليل الفنجان الآن. لم تُحفظ قراءة؛ تحقق من الاتصال ثم أعد المحاولة.' : 'The cup could not be analyzed. Nothing was saved; please retry.';
+             setState((current: any) => ({ ...current, reading: null, error: message, isScanning: false }));
         }
     };
 
@@ -105,6 +106,22 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
                     </h2>
                 </div>
             </div>
+
+            {error && !isScanning && (
+                <div role="alert" className="mx-4 rounded-2xl border border-red-400/30 bg-red-950/30 p-4 text-center text-sm leading-7 text-red-200">
+                    {error}
+                </div>
+            )}
+
+            {imagePreview && error && !isScanning && (
+                <button
+                    type="button"
+                    onClick={triggerScan}
+                    className="mx-4 rounded-2xl bg-stella-gold px-5 py-4 font-bold text-white shadow-md transition hover:brightness-110"
+                >
+                    {lang === 'ar' ? 'إعادة المحاولة بنفس الصورة' : 'Retry with this image'}
+                </button>
+            )}
 
             <div className="text-center px-4">
                 <p className="text-gray-600 font-tajawal text-sm mt-3 px-4 max-w-sm mx-auto leading-relaxed">
@@ -193,12 +210,12 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
                             {lang === 'ar' ? 'مشاركة الحكمة' : 'Share Wisdom'}
                         </button>
                         <button 
-                            onClick={() => setState({ ...state, imagePreview: null, reading: null, isScanning: false })}
+                            onClick={() => setState({ imagePreview: null, reading: null, isScanning: false, error: null })}
                             className="w-full border border-gray-200 text-gray-500 font-bold py-3 rounded-xl hover:bg-gray-50 hover:text-stella-gold transition-colors"
                         >
                             {lang === 'ar' ? 'قراءة فنجان جديد' : 'Read New Cup'}
                         </button>
-                        {imagePreview && <button onClick={() => setState({ ...state, reading: null, isScanning: false })} className="w-full border border-amber-300 text-amber-700 font-bold py-3 rounded-xl hover:bg-amber-50 transition-colors">{lang === 'ar' ? 'إعادة تحليل نفس الصورة' : 'Retry this image'}</button>}
+                        {imagePreview && <button onClick={() => setState((current: any) => ({ ...current, reading: null, error: null, isScanning: false }))} className="w-full border border-amber-300 text-amber-700 font-bold py-3 rounded-xl hover:bg-amber-50 transition-colors">{lang === 'ar' ? 'إعادة تحليل نفس الصورة' : 'Retry this image'}</button>}
                     </div>
                 </motion.div>
             )}

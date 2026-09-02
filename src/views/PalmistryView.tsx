@@ -7,12 +7,12 @@ import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestor
 import { logEvent } from 'firebase/analytics';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 
-import { UserChronosMatrix } from '../utils/contextCollector';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 export default function PalmistryView({ t, adminPrompt, lang, state, setState }: any) {
-    const { isScanning, imagePreview, reading } = state;
+    const { isScanning, imagePreview, reading, error } = state;
     const fileRef = useRef<HTMLInputElement>(null);
     const { user, profile, login } = useAuth();
     const [showRewardModal, setShowRewardModal] = useState(false);
@@ -20,8 +20,14 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState }:
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const image = await compressReadingImage(file);
-            setState({ ...state, imagePreview: image, reading: null });
+            try {
+                const image = await compressReadingImage(file);
+                setState((current: any) => ({ ...current, imagePreview: image, reading: null, error: null, isScanning: false }));
+            } catch {
+                setState((current: any) => ({ ...current, error: lang === 'ar' ? 'تعذّر تجهيز الصورة. اختر صورة أخرى.' : 'Could not prepare this image.', isScanning: false }));
+            } finally {
+                e.target.value = '';
+            }
         }
     };
 
@@ -52,48 +58,49 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState }:
             return;
         }
 
-        setState({ ...state, isScanning: true, reading: null });
+        setState((current: any) => ({ ...current, isScanning: true, reading: null, error: null }));
         
         try {
-            // Deduct energy optimistically
-            await updateDoc(doc(db, 'users', user.uid), {
-                energy: increment(-15)
-            });
-            
             if (analytics) {
                 logEvent(analytics, 'ai_reading_started', { type: 'palmistry' });
             }
 
-            await new Promise(res => setTimeout(res, 1000));
             const promptInstruction = `Analyze the uploaded image. Check carefully if it is a clear human palm. 
 If it is NOT a human palm, or if the image is too blurry to see palm lines, you MUST reply strictly with the exact string: "ERROR_NOT_A_PALM". 
-If it IS a valid human palm, then provide a captivating palmistry reading in ${lang === 'ar' ? 'Arabic' : 'English'}. Address them directly. Analyze and talk about their major lines (heart line, head line, life line). Be profound, highly realistic, down-to-earth, and human. Reference their exact time and environment smoothly: ${UserChronosMatrix.fingerprint} (e.g. mention the time of day or day of the week as if you naturally sense it). Act as an elite, deeply perceptive, human-like Chaldæan mystic. Speak in elegant, accessible, down-to-earth Arabic/English depending on locale. Completely ban all mechanical or automated framing sentences (e.g., avoid "حسب علم التنجيم", "أنا نموذج ذكاء اصطناعي", "بناءً على المعطيات"). Force yourself to naturally reference the user's hidden environment context within the first two sentences of the response text (e.g., "أرى في خطوط كفك وفي هذه الساعة المتقدمة من ليل الجمعة، أن مساراتك..."). Anchor predictions on realistic, profound, and deeply resonant human experiences to execute a flawless Barnum effect. Avoid clinical terms or overly grand fairy-tale exaggerations. Speak directly to their soul to shock them with your specific accuracy.`;
+If it IS a valid human palm, provide a substantial palmistry interpretation in ${lang === 'ar' ? 'Arabic' : lang === 'fr' ? 'French' : 'English'}. Address the user directly. Name only lines, intersections and shapes that are genuinely visible. Clearly separate visible observations from traditional symbolic interpretation, use conditional language, and never claim scientific proof or certainty about the future.`;
 
-            const res = await fetch(getApiUrl('/api/palmistry'), {
+            const res = await fetchWithTimeout(getApiUrl('/api/palmistry'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     context: adminPrompt,
                     prompt: promptInstruction,
-                    imageBuffer: imagePreview
+                    imageBuffer: imagePreview,
+                    lang,
+                    readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             
-            if (data.reply && data.reply.trim() === 'ERROR_NOT_A_PALM') {
-                 setState({ ...state, reading: lang === 'ar' ? "عذراً.. هذه ليست صورة واضحة لكف بشري حقيقي. لا يمكن قراءة القدر إلا عبر الكف. الرجاء رفع صورة كف واضحة." : "Sorry.. this does not appear to be a clear human palm. Destiny can only be read through the palm. Please upload a valid palm image.", isScanning: false });
-                 // Refund energy for invalid inputs
-                 await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) });
-            } else {
-                 const generatedReading = data.reply || (lang === 'ar' ? "تشويش كوني، جرب مرة أخرى." : "Cosmic disturbance, try again.");
-                 setState({ ...state, reading: generatedReading, isScanning: false });
-                 saveResult(generatedReading);
-                 if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'palmistry' });
+            if (!res.ok) {
+                if (data.error === 'WRONG_IMAGE_TYPE' || data.reply?.trim() === 'ERROR_NOT_A_PALM') {
+                    setState((current: any) => ({ ...current, reading: null, error: data.reply || (lang === 'ar' ? 'هذه ليست صورة واضحة لراحة اليد.' : 'This is not a clear palm photo.'), isScanning: false }));
+                    return;
+                }
+                throw new Error(data.error || `Reading failed (${res.status})`);
             }
+            const generatedReading = typeof data.reply === 'string' ? data.reply.trim() : '';
+            if (!generatedReading || generatedReading === 'ERROR_NOT_A_PALM') throw new Error('Empty palm reading');
+
+            setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
+            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) }).catch(persistenceError => {
+                console.error('Failed to update palmistry energy', persistenceError);
+            });
+            await saveResult(generatedReading);
+            if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'palmistry' });
         } catch (err) {
-             setState({ ...state, reading: lang === 'ar' ? "تشويش في الاتصال الكوني... لقد حجبوا الرؤية. حاول مجددا." : "Cosmic interference... they blocked the sight. Try again.", isScanning: false });
-             // Refund energy on network fail
-             await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) });
+             console.error('Palmistry reading failed', err);
+             setState((current: any) => ({ ...current, reading: null, error: lang === 'ar' ? 'تعذّر إكمال قراءة الكف الآن. لم تُحفظ قراءة ولم تُخصم طاقة؛ حاول بنفس الصورة مجدداً.' : 'The palm reading could not be completed. Nothing was saved or charged; please retry.', isScanning: false }));
              if (analytics) logEvent(analytics, 'ai_reading_failed', { type: 'palmistry' });
         }
     };
@@ -173,6 +180,12 @@ If it IS a valid human palm, then provide a captivating palmistry reading in ${l
                 </div>
             )}
 
+            {error && !isScanning && (
+                <div role="alert" className="mt-6 w-full max-w-[340px] rounded-2xl border border-red-400/30 bg-red-950/30 p-4 text-center text-sm leading-7 text-red-200">
+                    {error}
+                </div>
+            )}
+
             {imagePreview && !reading && !isScanning && (
                 <button 
                     onClick={triggerScan}
@@ -211,7 +224,7 @@ If it IS a valid human palm, then provide a captivating palmistry reading in ${l
                             {lang === 'ar' ? 'مشاركة الحكمة' : 'Share Wisdom'}
                         </button>
                         <button 
-                            onClick={() => setState({ ...state, imagePreview: null, reading: null, isScanning: false })}
+                            onClick={() => setState({ imagePreview: null, reading: null, isScanning: false, error: null })}
                             className="w-full text-center border-2 border-stella-gold/30 text-stella-gold bg-transparent font-bold py-4 rounded-xl hover:bg-stella-gold/5 transition-colors text-lg font-amiri tracking-wide uppercase"
                         >
                             {lang === 'ar' ? 'استشارة قدر جديد' : 'Consult New Destiny'}

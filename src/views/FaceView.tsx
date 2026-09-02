@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Image as ImageIcon, Sparkles, Loader } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
@@ -6,23 +6,23 @@ import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { getApiUrl } from '../utils/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { UserChronosMatrix } from '../utils/contextCollector';
 import { compressReadingImage } from '../utils/imageCompression';
 
-export default function FaceView({ t, adminPrompt, lang }: any) {
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [reading, setReading] = useState<string | null>(null);
-    const [isScanning, setIsScanning] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+export default function FaceView({ t, adminPrompt, lang, state, setState }: any) {
+    const { imagePreview, reading, isScanning, error } = state;
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             try {
                 const image = await compressReadingImage(file);
-                setImagePreview(image);
-                analyzeFace(image);
-            } catch { setError(lang === 'ar' ? 'تعذّر تجهيز الصورة. اختر صورة أخرى.' : 'Could not prepare this image.'); }
+                setState((current: any) => ({ ...current, imagePreview: image, reading: null, error: null }));
+                await analyzeFace(image);
+            } catch {
+                setState((current: any) => ({ ...current, isScanning: false, error: lang === 'ar' ? 'تعذّر تجهيز الصورة. اختر صورة أخرى.' : 'Could not prepare this image.' }));
+            } finally {
+                e.target.value = '';
+            }
         }
     };
 
@@ -43,9 +43,7 @@ export default function FaceView({ t, adminPrompt, lang }: any) {
     };
 
     const analyzeFace = async (image: string) => {
-        setIsScanning(true);
-        setReading(null);
-        setError(null);
+        setState((current: any) => ({ ...current, imagePreview: image, isScanning: true, reading: null, error: null }));
         try {
             const response = await fetchWithTimeout(getApiUrl('/api/face'), {
                 method: 'POST',
@@ -54,19 +52,24 @@ export default function FaceView({ t, adminPrompt, lang }: any) {
                     image,
                     prompt: adminPrompt,
                     lang,
-                    deviceData: UserChronosMatrix.fingerprint
+                    readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`
                 })
             });
-            const data = await response.json();
-            if (!response.ok || !data.reply) throw new Error(data.error || 'Reading failed');
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                if (data.error === 'WRONG_IMAGE_TYPE') {
+                    setState((current: any) => ({ ...current, isScanning: false, reading: null, error: data.reply || (lang === 'ar' ? 'هذه ليست صورة وجه واضحة.' : 'This is not a clear face photo.') }));
+                    return;
+                }
+                throw new Error(data.error || `Reading failed (${response.status})`);
+            }
+            if (!data.reply) throw new Error('Reading failed');
             const result = data.reply as string;
-            setReading(result);
+            setState((current: any) => ({ ...current, isScanning: false, reading: result, error: null }));
             await saveResult(result);
         } catch (cause) {
             console.error('Face reading failed', cause);
-            setError(lang === 'ar' ? 'تعذّر تحليل الصورة الآن. تحقّق من الاتصال وحاول مجدداً.' : lang === 'fr' ? "L’analyse a échoué. Vérifiez la connexion et réessayez." : 'The analysis failed. Check your connection and try again.');
-        } finally {
-            setIsScanning(false);
+            setState((current: any) => ({ ...current, isScanning: false, reading: null, error: lang === 'ar' ? 'تعذّر تحليل الصورة الآن. لم تُحفظ قراءة ولم يُخصم شيء؛ حاول مجدداً.' : lang === 'fr' ? "L’analyse a échoué. Rien n’a été enregistré; réessayez." : 'The analysis failed. Nothing was saved; please retry.' }));
         }
     };
 
@@ -124,7 +127,8 @@ export default function FaceView({ t, adminPrompt, lang }: any) {
                             )}
                         </div>
                         <button 
-                            onClick={() => { setImagePreview(null); setReading(null); }}
+                            type="button"
+                            onClick={() => setState({ imagePreview: null, reading: null, isScanning: false, error: null })}
                             className="mt-6 text-sm text-stella-gold/70 font-tajawal hover:text-stella-gold transition-colors font-bold tracking-wide"
                         >
                             {t.retake}
@@ -145,6 +149,16 @@ export default function FaceView({ t, adminPrompt, lang }: any) {
                         {reading}
                     </p>
                 </motion.div>
+            )}
+
+            {imagePreview && error && !isScanning && (
+                <button
+                    type="button"
+                    onClick={() => analyzeFace(imagePreview)}
+                    className="w-full rounded-2xl bg-stella-gold px-5 py-4 font-bold text-white shadow-md transition hover:brightness-110"
+                >
+                    {lang === 'ar' ? 'إعادة المحاولة بنفس الصورة' : lang === 'fr' ? 'Réessayer avec cette image' : 'Retry with this image'}
+                </button>
             )}
         </motion.div>
     );

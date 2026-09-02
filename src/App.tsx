@@ -8,6 +8,14 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { cn } from './utils/cn';
 import { AppStateManager } from './utils/AppStateManager';
 
+type ViewId = 'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream' | 'privacy' | 'methodology' | 'moon' | 'dream-journal' | 'rituals';
+
+const RESTORABLE_VIEWS = new Set<ViewId>([
+    'home', 'palmistry', 'face', 'tarot', 'divination', 'coffee', 'notifications',
+    'dashboard', 'premium', 'zodiac', 'other', 'history', 'dream', 'privacy',
+    'methodology', 'moon', 'dream-journal', 'rituals'
+]);
+
 const HomeView = lazy(() => import('./views/HomeView'));
 const PalmistryView = lazy(() => import('./views/PalmistryView'));
 const TarotView = lazy(() => import('./views/TarotView'));
@@ -42,20 +50,28 @@ export default function App() {
         if (browserLang.startsWith('fr')) return 'fr';
         return browserLang.startsWith('ar') ? 'ar' : 'en';
     });
-    const [activeView, setActiveView] = useState<'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream' | 'privacy' | 'methodology' | 'moon' | 'dream-journal' | 'rituals'>('home');
+    const [activeView, setActiveView] = useState<ViewId>(() => {
+        const saved = AppStateManager.get('lastView') as ViewId;
+        return RESTORABLE_VIEWS.has(saved) ? saved : 'home';
+    });
     const adminPrompt = LANGUAGE_PACK.ar.defaultPrompt;
     const [showLangMenu, setShowLangMenu] = useState(false);
     
     // Persistent app states
-    const [palmState, setPalmState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false });
+    const [palmState, setPalmState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false, error: null as string|null });
+    const [faceState, setFaceState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false, error: null as string|null });
     const [tarotState, setTarotState] = useState({ drawnCards: [] as number[], reading: null as string|null, isLoading: false, sessionCards: [] as string[], lastDrawTime: null as number|null });
     const [divState, setDivState] = useState({ name: '', motherName: '', reading: null as string|null, isLoading: false });
-    const [coffeeState, setCoffeeState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false });
+    const [coffeeState, setCoffeeState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false, error: null as string|null });
 
     const t = LANGUAGE_PACK[lang];
     useEffect(() => {
         if (activeView === 'admin' && !isAdmin) setActiveView('home');
     }, [activeView, isAdmin]);
+
+    useEffect(() => {
+        AppStateManager.set('lastView', activeView === 'admin' ? 'home' : activeView);
+    }, [activeView]);
 
     useEffect(() => {
         AppStateManager.set('lang', lang);
@@ -196,7 +212,7 @@ export default function App() {
                             {activeView === 'home' && <HomeView key="home" t={t} onNavigate={setActiveView} lang={lang} />}
                             {activeView === 'zodiac' && <ZodiacView key="zodiac" t={t} lang={lang} />}
                             {activeView === 'palmistry' && <PalmistryView key="palm" t={t} adminPrompt={adminPrompt} lang={lang} state={palmState} setState={setPalmState} />}
-                            {activeView === 'face' && <FaceView key="face" t={t} adminPrompt={adminPrompt} lang={lang} />}
+                            {activeView === 'face' && <FaceView key="face" t={t} adminPrompt={adminPrompt} lang={lang} state={faceState} setState={setFaceState} />}
                             {activeView === 'tarot' && <TarotView key="tarot" t={t} adminPrompt={adminPrompt} lang={lang} state={tarotState} setState={setTarotState} />}
                             {activeView === 'divination' && <DivinationView key="divination" t={t} adminPrompt={adminPrompt} lang={lang} state={divState} setState={setDivState} />}
                             {activeView === 'coffee' && <CoffeeView key="coffee" t={t} lang={lang} state={coffeeState} setState={setCoffeeState} />}

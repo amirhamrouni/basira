@@ -16,6 +16,7 @@ export interface AppState {
     favoriteZodiacId: string | null;
     dailyCache: Record<string, { text: string; fetchedAt: number }>;
     readingCount: number;
+    lastView: string;
 }
 
 const DEFAULT_STATE: AppState = {
@@ -28,6 +29,7 @@ const DEFAULT_STATE: AppState = {
     favoriteZodiacId: null,
     dailyCache: {},
     readingCount: 0,
+    lastView: 'home',
 };
 
 const VALID_LANGS = ['ar', 'en', 'fr'] as const;
@@ -51,6 +53,7 @@ function isStateValid(state: unknown): state is AppState {
     if (!VALID_LANGS.includes(s.lang as 'ar' | 'en' | 'fr')) return false;
     if (!VALID_ZODIACS.includes(s.zodiacId as string | null)) return false;
     if (typeof s.dailyCache !== 'object' || Array.isArray(s.dailyCache)) return false;
+    if (s.lastView !== undefined && typeof s.lastView !== 'string') return false;
 
     return true;
 }
