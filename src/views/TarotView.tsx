@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, RotateCcw, Send, Sparkles } from 'lucide-react';
+import { BookOpen, CalendarCheck, Flame, RotateCcw, Send, Sparkles } from 'lucide-react';
 import { tarotDeck, TarotCard } from '../data/tarotDeck';
 import { getApiUrl } from '../utils/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -11,6 +11,14 @@ export default function TarotView({ lang, state, setState }: any) {
     const [spreadId, setSpreadId] = useState('past-present-direction');
     const isAr = lang === 'ar';
     const illustratedDeck = useMemo(() => tarotDeck.filter(card => card.arcana === 'major'), []);
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const dailyCard = useMemo(() => {
+        const seed = todayKey.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        return illustratedDeck[seed % illustratedDeck.length];
+    }, [illustratedDeck, todayKey]);
+    const [dailyProgress, setDailyProgress] = useState<{ last: string; streak: number }>(() => {
+        try { return JSON.parse(localStorage.getItem('basira_tarot_daily_v1') || '{"last":"","streak":0}'); } catch { return { last: '', streak: 0 }; }
+    });
     const spreads = isAr ? [
         { id: 'past-present-direction', name: 'الماضي • الحاضر • الاتجاه', positions: ['الماضي المؤثر', 'ما يجري الآن', 'الاتجاه القادم'] },
         { id: 'problem-cause-solution', name: 'المشكلة • السبب • المفتاح', positions: ['العقدة الظاهرة', 'السبب الخفي', 'مفتاح الحل'] },
@@ -43,7 +51,14 @@ export default function TarotView({ lang, state, setState }: any) {
             const response = await fetchWithTimeout(getApiUrl('/api/tarot'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cards: selected, question, lang, spreadName: activeSpread.name, positions: activeSpread.positions })
+                body: JSON.stringify({
+                    cards: selected,
+                    question,
+                    lang,
+                    spreadName: activeSpread.name,
+                    positions: activeSpread.positions,
+                    readingId: crypto.randomUUID()
+                })
             });
             const data = await response.json();
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: data.reply || buildLocalReading(cards, question, isAr) });
@@ -57,6 +72,14 @@ export default function TarotView({ lang, state, setState }: any) {
         setState({ ...state, sessionCards: shuffled, drawnCards: [], reading: null });
     };
 
+    const claimDaily = () => {
+        if (dailyProgress.last === todayKey) return;
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const next = { last: todayKey, streak: dailyProgress.last === yesterday ? dailyProgress.streak + 1 : 1 };
+        localStorage.setItem('basira_tarot_daily_v1', JSON.stringify(next));
+        setDailyProgress(next);
+    };
+
     return (
         <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-10">
             <section className="oracle-frame rounded-[28px] p-7 text-white">
@@ -64,6 +87,12 @@ export default function TarotView({ lang, state, setState }: any) {
                 <p className="text-[10px] font-bold uppercase tracking-[.28em] text-[#d9b96e]">RIDER–WAITE–SMITH • MAJOR ARCANA</p>
                 <h2 className="oracle-title mt-3 font-amiri text-4xl font-bold">{isAr ? 'أسرار التاروت' : 'Tarot Secrets'}</h2>
                 <p className="mt-3 max-w-sm text-sm leading-7 text-white/65">{isAr ? 'قراءة رمزية للسؤال والماضي والحاضر والاتجاه القادم—ليست حكماً على المستقبل.' : 'A symbolic past, present and direction reading grounded in your real question.'}</p>
+            </section>
+
+            <section className="oracle-frame rounded-[24px] p-5">
+                <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2 text-[#f3d994]"><CalendarCheck className="h-5 w-5" /><h3 className="font-amiri text-xl font-bold">{isAr ? 'بطاقة اليوم' : 'Card of the day'}</h3></div><span className="flex items-center gap-1 rounded-full bg-orange-400/10 px-3 py-1 text-xs text-orange-300"><Flame className="h-4 w-4" />{dailyProgress.streak}</span></div>
+                <div className="flex items-center gap-4 rounded-2xl border border-[#d9b96e]/20 bg-black/20 p-4">{dailyCard.imageUrl ? <img src={dailyCard.imageUrl} alt={isAr ? dailyCard.nameAr : dailyCard.name} className="h-28 w-20 rounded-lg object-cover shadow-lg" /> : <div className="grid h-28 w-20 place-items-center rounded-lg bg-purple-900 text-3xl">{dailyCard.symbol}</div>}<div className="min-w-0"><strong className="font-amiri text-xl text-[#f3d994]">{isAr ? dailyCard.nameAr : dailyCard.name}</strong><p className="mt-2 text-xs leading-6 text-white/60">{dailyCard.reflection}</p></div></div>
+                <button onClick={claimDaily} disabled={dailyProgress.last === todayKey} className="mt-4 w-full rounded-xl bg-[#d9b96e] py-3 text-sm font-bold text-[#171022] disabled:bg-white/10 disabled:text-white/40">{dailyProgress.last === todayKey ? (isAr ? 'تمّ إنجاز تأمل اليوم' : 'Today completed') : (isAr ? 'ابدأ سلسلة اليوم' : 'Complete today')}</button>
             </section>
 
             <section className="oracle-frame rounded-[24px] p-5">

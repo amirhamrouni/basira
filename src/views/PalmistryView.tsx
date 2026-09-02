@@ -9,6 +9,7 @@ import CosmicRewardModal from '../components/CosmicRewardModal';
 
 import { UserChronosMatrix } from '../utils/contextCollector';
 import { getApiUrl } from '../utils/api';
+import { compressReadingImage } from '../utils/imageCompression';
 
 export default function PalmistryView({ t, adminPrompt, lang, state, setState }: any) {
     const { isScanning, imagePreview, reading } = state;
@@ -16,14 +17,11 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState }:
     const { user, profile, login } = useAuth();
     const [showRewardModal, setShowRewardModal] = useState(false);
 
-    const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setState({ ...state, imagePreview: reader.result as string, reading: null });
-            };
-            reader.readAsDataURL(file);
+            const image = await compressReadingImage(file);
+            setState({ ...state, imagePreview: image, reading: null });
         }
     };
 

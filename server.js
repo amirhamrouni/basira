@@ -1,7 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -12,6 +15,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const API_TIMEOUT_MS = 10000; // 10s server-side timeout
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const SUPPORTED_LANGUAGES = new Set(['ar', 'en', 'fr']);
+const SUPPORTED_ZODIAC_SIGNS = new Set([
+    'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+    'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'
+]);
 const FALLBACK_AR = 'الأثير مزدحم بالترددات في هذه اللحظة، يرجى المحاولة بعد قليل لضمان دقة القراءة.';
 const FALLBACK_EN = 'The cosmic frequencies are busy right now. Please try again in a moment for an accurate reading.';
 const FALLBACK_FR = 'Les fréquences cosmiques sont saturées en ce moment. Réessayez dans un instant.';
@@ -40,6 +49,21 @@ function getZodiacName(zodiac, lang) {
     if (lang === 'ar') return ZODIAC_MAP_AR[zodiac] || zodiac;
     if (lang === 'fr') return ZODIAC_MAP_FR[zodiac] || zodiac;
     return zodiac.charAt(0).toUpperCase() + zodiac.slice(1);
+}
+
+export function safeLanguage(value) {
+    return SUPPORTED_LANGUAGES.has(value) ? value : 'ar';
+}
+
+export function cleanText(value, maxLength = 4000) {
+    return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+export function parseImageDataUrl(value) {
+    if (typeof value !== 'string') return null;
+    const match = value.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+    if (!match || Math.floor(match[2].length * 0.75) > MAX_IMAGE_BYTES) return null;
+    return { mimeType: match[1], data: match[2] };
 }
 
 /**
@@ -139,8 +163,22 @@ async function generateWithRetry(callFn, maxRetries = 3) {
 async function startServer() {
     const app = express();
 
-    app.use(cors());
-    app.use(express.json({ limit: '50mb' }));
+    app.disable('x-powered-by');
+    app.set('trust proxy', 1);
+    app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+    const configuredOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
+    app.use(cors({
+        origin(origin, callback) {
+            if (!origin || configuredOrigins.length === 0 || configuredOrigins.includes(origin)) return callback(null, true);
+            return callback(new Error('Origin not allowed'));
+        },
+        methods: ['GET', 'POST'], maxAge: 86400
+    }));
+    app.use(express.json({ limit: '8mb', strict: true }));
+    app.use('/api', rateLimit({
+        windowMs: 60_000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false,
+        message: { error: 'Too many requests. Please try again shortly.' }
+    }));
 
     // ── Initialize Gemini ──
     const initAI = () => {
@@ -153,10 +191,45 @@ async function startServer() {
     };
 
     const ai = initAI();
+    const openai = process.env.OPENAI_API_KEY
+        ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+        : null;
+
+    function toOpenAIInput(contents) {
+        if (typeof contents === 'string') return contents;
+        const content = [];
+        const items = Array.isArray(contents) ? contents : [contents];
+        for (const item of items) {
+            const parts = item?.parts || [item];
+            for (const part of parts) {
+                if (part?.text) content.push({ type: 'input_text', text: part.text });
+                if (part?.inlineData) {
+                    content.push({
+                        type: 'input_image',
+                        image_url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+                        detail: 'auto'
+                    });
+                }
+            }
+        }
+        return [{ role: 'user', content }];
+    }
 
     // Unified AI router supporting Groq & Gemini
     async function generateContent({ contents, config }) {
         const groqKey = process.env.GROQ_API_KEY;
+        const preferredProvider = (process.env.AI_PROVIDER || 'gemini').toLowerCase();
+
+        if (openai && (preferredProvider === 'openai' || (!ai && !groqKey))) {
+            console.log('[AI] Routing request to OpenAI Responses API...');
+            const response = await openai.responses.create({
+                model: process.env.OPENAI_MODEL || 'gpt-5-mini',
+                input: toOpenAIInput(contents),
+                max_output_tokens: config?.maxOutputTokens ?? 800
+            });
+            return { text: response.output_text };
+        }
+
         if (groqKey) {
             console.log('[AI] Routing request to Groq...');
             let messages = [];
@@ -261,16 +334,18 @@ async function startServer() {
     // HYBRID AI ENGINE: Real API data → Rewrite
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/daily-horoscope', async (req, res) => {
-        const { zodiac, lang = 'ar', date } = req.body;
+        const zodiac = cleanText(req.body?.zodiac, 20).toLowerCase();
+        const lang = safeLanguage(req.body?.lang);
+        const date = cleanText(req.body?.date, 40);
 
-        if (!zodiac) {
-            return res.status(400).json({ error: 'Missing zodiac sign', reply: getFallback(lang) });
+        if (!SUPPORTED_ZODIAC_SIGNS.has(zodiac)) {
+            return res.status(400).json({ error: 'Invalid zodiac sign', reply: getFallback(lang) });
         }
 
         const realData = await fetchRealHoroscope(zodiac);
 
         // If no API key is set anywhere, return raw data or fallback
-        if (!ai && !process.env.GROQ_API_KEY) {
+        if (!ai && !openai && !process.env.GROQ_API_KEY) {
             const reply = realData.success ? realData.text : getFallback(lang);
             return res.json({ reply, source: realData.success ? 'real_api' : 'fallback' });
         }
@@ -345,16 +420,15 @@ Write only the reading. No titles, no labels, no preamble.`;
     // ENDPOINT: /api/coffee — Coffee Cup Reading
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/coffee', async (req, res) => {
-        if (!ai && !process.env.GROQ_API_KEY) {
+        if (!ai && !openai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
 
         try {
-            const { image, lang = 'ar', deviceData } = req.body;
-            if (!image) return res.status(400).json({ error: 'Missing image', reply: getFallback(lang) });
-
-            const base64Data = image.split(',')[1];
-            if (!base64Data) return res.status(400).json({ error: 'Invalid image format', reply: getFallback(lang) });
+            const lang = safeLanguage(req.body?.lang);
+            const deviceData = cleanText(req.body?.deviceData, 800);
+            const image = parseImageDataUrl(req.body?.image);
+            if (!image) return res.status(400).json({ error: 'Invalid or oversized image', reply: getFallback(lang) });
 
             const langInstruction = lang === 'ar'
                 ? 'Respond in elegant, poetic Arabic'
@@ -363,7 +437,7 @@ Write only the reading. No titles, no labels, no preamble.`;
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { inlineData: { data: base64Data, mimeType: 'image/jpeg' } },
+                        { inlineData: image },
                         {
                             text: `First, critically analyze if this image shows the inside of a coffee cup (فنجان قهوة) with coffee grounds. If not a coffee cup, reply EXACTLY with "ERROR_NOT_A_CUP" and nothing else.
 
@@ -397,21 +471,21 @@ Rules:
     // ENDPOINT: /api/palmistry — Palm Reading
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/palmistry', async (req, res) => {
-        if (!ai && !process.env.GROQ_API_KEY) {
+        if (!ai && !openai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
         try {
-            const { imageBuffer, prompt, context, lang = 'ar' } = req.body;
-            if (!imageBuffer) return res.status(400).json({ error: 'Missing image', reply: getFallback(lang) });
-
-            const base64Data = imageBuffer.split(',')[1];
-            if (!base64Data) return res.status(400).json({ error: 'Invalid image format', reply: getFallback(lang) });
+            const lang = safeLanguage(req.body?.lang);
+            const prompt = cleanText(req.body?.prompt, 3000);
+            const context = cleanText(req.body?.context, 2000);
+            const image = parseImageDataUrl(req.body?.imageBuffer);
+            if (!image) return res.status(400).json({ error: 'Invalid or oversized image', reply: getFallback(lang) });
 
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
                         { text: (context || '') + '\n\n' + (prompt || '') },
-                        { inlineData: { mimeType: 'image/jpeg', data: base64Data } }
+                        { inlineData: image }
                     ],
                     config: { temperature: 0.88, maxOutputTokens: 700 }
                 })
@@ -431,12 +505,14 @@ Rules:
     // ENDPOINT: /api/chat — General Divination/Tarot Chat
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/chat', async (req, res) => {
-        if (!ai && !process.env.GROQ_API_KEY) {
+        if (!ai && !openai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
 
         try {
-            const { prompt, context, lang = 'ar' } = req.body;
+            const lang = safeLanguage(req.body?.lang);
+            const prompt = cleanText(req.body?.prompt, 3000);
+            const context = cleanText(req.body?.context, 2000);
             if (!prompt) return res.status(400).json({ error: 'Missing prompt', reply: getFallback(lang) });
 
             const response = await generateWithRetry(() =>
@@ -460,15 +536,15 @@ Rules:
     // ENDPOINT: /api/face — Face/Aura Reading
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/face', async (req, res) => {
-        if (!ai && !process.env.GROQ_API_KEY) {
+        if (!ai && !openai && !process.env.GROQ_API_KEY) {
             return res.status(500).json({ error: 'API Key missing.', reply: getFallback(req.body?.lang || 'ar') });
         }
         try {
-            const { image, prompt, lang = 'ar', deviceData } = req.body;
-            if (!image) return res.status(400).json({ error: 'Missing image', reply: getFallback(lang) });
-
-            const base64Data = image.split(',')[1];
-            if (!base64Data) return res.status(400).json({ error: 'Invalid image format', reply: getFallback(lang) });
+            const lang = safeLanguage(req.body?.lang);
+            const prompt = cleanText(req.body?.prompt, 3000);
+            const deviceData = cleanText(req.body?.deviceData, 800);
+            const image = parseImageDataUrl(req.body?.image);
+            if (!image) return res.status(400).json({ error: 'Invalid or oversized image', reply: getFallback(lang) });
 
             const langInstruction = lang === 'ar'
                 ? 'اكتب بالعربية الفصيحة الشاعرية'
@@ -477,7 +553,7 @@ Rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { inlineData: { data: base64Data, mimeType: 'image/jpeg' } },
+                        { inlineData: image },
                         {
                             text: `${prompt || ''}
 You are a master physiognomist and aura reader. ${langInstruction}.
@@ -503,18 +579,41 @@ Write 5-6 rich, poetic sentences.`
         }
     });
 
+    // ── Dream reflection: psychological + cultural symbolism, never prophecy ──
+    app.post('/api/dream', async (req, res) => {
+        const lang = safeLanguage(req.body?.lang);
+        const dream = cleanText(req.body?.prompt, 3000);
+        if (dream.length < 15) return res.status(400).json({ error: 'Dream description is too short' });
+
+        const localReply = lang === 'ar'
+            ? 'قراءة نفسية ورمزية: لا يوجد معنى ثابت واحد للحلم؛ الأهم هو الشعور الذي بقي بعد الاستيقاظ وما عشته في اليوم السابق. علمياً، قد تمزج الأحلام الذاكرة والانفعال والضغط أثناء النوم، لذلك لا تُعامل كنبوءة. اسأل نفسك: ما الشعور الأقوى في الحلم، وأين أعيشه هذه الأيام؟ اكتب الحلم والشعور المرتبط به ثم دوّن حدثاً واحداً قد يكون غذّاه.'
+            : 'Dreams can blend memory, emotion, and daily stress, so this reflection is not a prediction. Focus on the strongest feeling in the dream and where it appears in your waking life. Write down one recent event that may have shaped it.';
+
+        if (!ai && !openai && !process.env.GROQ_API_KEY) return res.json({ reply: localReply, source: 'local' });
+        const langRule = lang === 'ar' ? 'اكتب بالعربية الواضحة' : lang === 'fr' ? 'Écris en français' : 'Write in English';
+        try {
+            const response = await generateWithRetry(() => generateContent({
+                contents: `${langRule}. Analyze this dream through emotional psychology, memory, daily stress, and cultural symbolism clearly labeled as non-factual: ${dream}. Ask one reflective question and suggest one journaling step. Never predict death, illness, pregnancy, betrayal, magic, or future events.`,
+                config: { maxOutputTokens: 700 }
+            }));
+            return res.json({ reply: response.text?.trim() || localReply, source: 'ai' });
+        } catch (error) {
+            console.warn('[Dream API] AI unavailable, using local reflection:', error.message);
+            return res.json({ reply: localReply, source: 'local' });
+        }
+    });
+
     // ─────────────────────────────────────────────────────────────────────────
     // ENDPOINT: /api/health — Server health check
     // ─────────────────────────────────────────────────────────────────────────
     app.get('/api/health', (req, res) => {
-        const geminiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-        const groqKey = process.env.GROQ_API_KEY;
         res.json({
             status: 'ok',
-            aiReady: !!ai || !!groqKey,
+            aiReady: !!ai || !!openai || !!process.env.GROQ_API_KEY,
             providers: {
-                gemini: !!geminiKey,
-                groq: !!groqKey
+                gemini: !!ai,
+                openai: !!openai,
+                groq: !!process.env.GROQ_API_KEY
             },
             timestamp: new Date().toISOString(),
             version: '2.0.0'
@@ -524,6 +623,8 @@ Write 5-6 rich, poetic sentences.`
     // ─────────────────────────────────────────────────────────────────────────
     // Static/Dev Server Setup
     // ─────────────────────────────────────────────────────────────────────────
+    app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found' }));
+
     const isProd = process.env.NODE_ENV === 'production';
 
     if (!isProd) {
@@ -558,7 +659,7 @@ Write 5-6 rich, poetic sentences.`
     const PORT = process.env.PORT || 3000;
     const server = app.listen(PORT, '0.0.0.0', () => {
         const groqKey = process.env.GROQ_API_KEY;
-        let aiEngine = ai ? '✅ Gemini Connected' : '❌ API Key Missing';
+        let aiEngine = ai ? '✅ Gemini Connected' : openai ? '✅ OpenAI Connected' : '❌ API Key Missing';
         if (groqKey) {
             aiEngine = '✅ Groq Connected (Llama)';
         }
@@ -585,4 +686,6 @@ Write 5-6 rich, poetic sentences.`
     });
 }
 
-startServer();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    startServer();
+}

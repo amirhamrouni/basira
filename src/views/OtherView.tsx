@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ScanFace, Coffee, Crown, Eye, History, ShieldCheck } from 'lucide-react';
+import { ScanFace, Coffee, Crown, Eye, History, ShieldCheck, BookOpenCheck, MoonStar, BookHeart, Sparkles } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 
 export default function OtherView({ t, lang, onNavigate }: any) {
@@ -16,6 +16,20 @@ export default function OtherView({ t, lang, onNavigate }: any) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-1">
+                <motion.div whileHover={{ scale: 1.02 }} onClick={() => onNavigate('moon')} className="oracle-frame p-6 rounded-2xl cursor-pointer flex items-center gap-4 group">
+                    <div className="w-14 h-14 rounded-full bg-[#d9b96e]/10 flex items-center justify-center border border-[#d9b96e]/30"><MoonStar className="text-[#f3d994] w-7 h-7" /></div>
+                    <div><h3 className="text-lg font-bold text-[#f3d994] font-amiri">{lang === 'ar' ? 'رزنامة القمر' : 'Moon Calendar'}</h3><p className="text-xs text-white/50 font-tajawal mt-1">{lang === 'ar' ? 'أطوار محسوبة ومحطات الشهر القادمة' : 'Calculated phases and upcoming milestones'}</p></div>
+                </motion.div>
+
+                <motion.div whileHover={{ scale: 1.02 }} onClick={() => onNavigate('dream-journal')} className="oracle-frame p-6 rounded-2xl cursor-pointer flex items-center gap-4 group">
+                    <div className="w-14 h-14 rounded-full bg-purple-400/10 flex items-center justify-center border border-purple-300/25"><BookHeart className="text-purple-200 w-7 h-7" /></div>
+                    <div><h3 className="text-lg font-bold text-purple-100 font-amiri">{lang === 'ar' ? 'دفتر الأحلام' : 'Dream Journal'}</h3><p className="text-xs text-white/50 font-tajawal mt-1">{lang === 'ar' ? 'حفظ خاص واكتشاف الرموز المتكررة' : 'Private journal and recurring motifs'}</p></div>
+                </motion.div>
+
+                <motion.div whileHover={{ scale: 1.02 }} onClick={() => onNavigate('rituals')} className="oracle-frame p-6 rounded-2xl cursor-pointer flex items-center gap-4 group">
+                    <div className="w-14 h-14 rounded-full bg-teal-400/10 flex items-center justify-center border border-teal-300/25"><Sparkles className="text-teal-200 w-7 h-7" /></div>
+                    <div><h3 className="text-lg font-bold text-teal-100 font-amiri">{lang === 'ar' ? 'مراسم وألعاب' : 'Rituals & Games'}</h3><p className="text-xs text-white/50 font-tajawal mt-1">{lang === 'ar' ? 'تنفّس وتحديات تعمل دون توكنات' : 'Breathing and zero-token challenges'}</p></div>
+                </motion.div>
                 {/* Numerology / Divination */}
                 {isAdmin && <motion.div
                     whileHover={{ scale: 1.02 }}
@@ -43,6 +57,20 @@ export default function OtherView({ t, lang, onNavigate }: any) {
                     <div>
                         <h3 className="text-lg font-bold text-green-800 font-amiri">{t.features.face}</h3>
                         <p className="text-xs text-gray-500 font-tajawal mt-1">{t.features.faceDesc}</p>
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => onNavigate('methodology')}
+                    className="glass-card p-6 border-sky-200 shadow-sm rounded-2xl cursor-pointer bg-gradient-to-br from-sky-50/60 to-white flex items-center gap-4 group hover:shadow-md transition-shadow"
+                >
+                    <div className="w-14 h-14 rounded-full bg-sky-100/60 flex items-center justify-center border border-sky-200">
+                        <BookOpenCheck className="text-sky-700 w-7 h-7" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-sky-900 font-amiri">{lang === 'ar' ? 'المنهج والمصادر' : 'Method & sources'}</h3>
+                        <p className="text-xs text-gray-500 font-tajawal mt-1">{lang === 'ar' ? 'اعرف ما هو محسوب، بحثي أو تراثي' : 'See what is calculated, researched, or traditional'}</p>
                     </div>
                 </motion.div>
 

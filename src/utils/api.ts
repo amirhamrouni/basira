@@ -4,7 +4,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Production backend URL for mobile (Capacitor) builds
-const PRODUCTION_API_URL = 'https://basira-qx6d.onrender.com';
+const PRODUCTION_API_URL = 'https://basira-preview.amiris001.chatgpt.site';
 
 export function getApiUrl(endpoint: string): string {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -20,4 +20,3 @@ export function getApiUrl(endpoint: string): string {
     // For standard web browsers, relative URLs work perfectly with the proxy/Vite server
     return `${API_BASE_URL}${cleanEndpoint}`;
 }
-

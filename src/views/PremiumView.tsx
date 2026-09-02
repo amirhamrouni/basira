@@ -12,7 +12,7 @@ const tiers = [
     {
         id: 'adept',
         name: { en: 'The Adept', ar: 'المتخصص' },
-        price: { en: '$4.99/mo', ar: '$4.99/شهر' },
+        price: { en: 'Free beta', ar: 'تجربة مجانية' },
         features: {
             en: ['Ad-free experience', 'Unlimited basic readings', 'Monthly 50 Stardust'],
             ar: ['تجربة بدون إعلانات', 'قراءات أساسية لا محدودة', '50 غبار نجمي شهرياً']
@@ -24,7 +24,7 @@ const tiers = [
     {
         id: 'oracle',
         name: { en: 'The Oracle', ar: 'العراف' },
-        price: { en: '$12.99/mo', ar: '$12.99/شهر' },
+        price: { en: 'Free beta', ar: 'تجربة مجانية' },
         features: {
             en: ['Everything in Adept', 'Deep psychological analysis', 'Unlimited Cosmic Energy', 'Priority AI processing'],
             ar: ['كل ميزات المتخصص', 'تحليل نفسي عميق', 'طاقة كونية لا محدودة', 'أولوية في معالجة الذكاء الاصطناعي']
@@ -40,6 +40,7 @@ export default function PremiumView({ lang }: any) {
     const isAr = lang === 'ar';
     const [selectedTier, setSelectedTier] = useState('oracle');
     const [showAdModal, setShowAdModal] = useState(false);
+    const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
     const { user, profile, login } = useAuth();
     
     const xp = profile?.xp || 0;
@@ -47,6 +48,26 @@ export default function PremiumView({ lang }: any) {
     const nextLevelXp = level * 1000;
     
     const rewardAmount = remoteConfig ? getValue(remoteConfig, 'ad_reward_energy').asNumber() : 10;
+
+    const handleCheckout = () => {
+        if (!user) {
+            login();
+            return;
+        }
+        const checkoutUrl = import.meta.env.VITE_CHECKOUT_URL as string | undefined;
+        if (!checkoutUrl) {
+            const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+            localStorage.setItem('basira_beta_trial', JSON.stringify({ tier: selectedTier, expiresAt }));
+            setCheckoutMessage(isAr
+                ? 'تم تفعيل تجربة Oracle المجانية لمدة 7 أيام. لا توجد عملية دفع أو خصم.'
+                : 'Your free 7-day Oracle beta is active. No payment was made.');
+            return;
+        }
+        const url = new URL(checkoutUrl);
+        url.searchParams.set('plan', selectedTier);
+        url.searchParams.set('uid', user.uid);
+        window.location.assign(url.toString());
+    };
     
     const handleRewardComplete = async () => {
         if (!user) {
@@ -223,7 +244,9 @@ export default function PremiumView({ lang }: any) {
 
                             <AnimatePresence>
                                 {selectedTier === tier.id && (
-                                    <motion.button 
+                                    <motion.button
+                                        type="button"
+                                        onClick={handleCheckout}
                                         initial={{ opacity: 0, height: 0 }}
                                         animate={{ opacity: 1, height: 'auto' }}
                                         exit={{ opacity: 0, height: 0 }}
@@ -234,7 +257,7 @@ export default function PremiumView({ lang }: any) {
                                                 : "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white"
                                         )}
                                     >
-                                        {isAr ? 'تأكيد الارتقاء' : 'Confirm Ascension'}
+                                        {isAr ? 'ابدأ تجربة مجانية 7 أيام' : 'Start 7-day free beta'}
                                     </motion.button>
                                 )}
                             </AnimatePresence>
@@ -242,6 +265,12 @@ export default function PremiumView({ lang }: any) {
                     ))}
                 </div>
             </div>
+
+            {checkoutMessage && (
+                <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800">
+                    {checkoutMessage}
+                </div>
+            )}
 
             <CosmicRewardModal 
                 isOpen={showAdModal}

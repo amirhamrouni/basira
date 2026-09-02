@@ -44,11 +44,14 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
 
             const deviceData = UserChronosMatrix.fingerprint;
             
-            const res = await fetch(getApiUrl('/api/chat'), {
+            const res = await fetch(getApiUrl('/api/divination'), {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({
-                     context: `${adminPrompt}\nThe user's name is ${name} and their mother's name is ${motherName}. Device Hint:\n${deviceData}`,
+                     name,
+                     motherName,
+                     lang,
+                     context: `${adminPrompt}\nDevice Hint:\n${deviceData}`,
                      prompt: `First, critically analyze the user's name ("${name}") and mother's name ("${motherName}"). If either name is clearly fake, gibberish, a random string, or not a real human name, you MUST reply strictly with the exact string: "ERROR_INVALID_NAME".
                      If both names appear to be valid human names, proceed: Analyze the numerological value (حساب الجمل) of the user's name and mother's name. Act as an elite, deeply perceptive, human-like Chaldæan mystic and psychological reader. Speak in elegant, accessible, down-to-earth ${lang === 'ar' ? 'Arabic' : 'English'}. Completely ban all mechanical or automated framing sentences (e.g., avoid "حسب علم التنجيم", "أنا نموذج ذكاء اصطناعي", "بناءً على المعطيات"). Force yourself to naturally reference the user's hidden environment context within the first two sentences of the response text (e.g., "أرى في اسمك واسم والدتك تقاطعات ترتبط بزمانك هذا..."). Anchor predictions on realistic, profound, and deeply resonant human experiences to execute a flawless Barnum effect. Reference their exact time and environment seamlessly: ${deviceData ?? ''}.`
                  })

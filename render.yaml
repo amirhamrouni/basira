@@ -3,10 +3,20 @@ services:
     name: basira
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run check
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: gemini
+      - key: OPENAI_MODEL
+        value: gpt-5-mini
+      - key: ALLOWED_ORIGINS
         sync: false

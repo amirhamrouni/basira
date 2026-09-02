@@ -43,7 +43,7 @@ export default function DreamView({ lang }: { lang: 'ar' | 'en' | 'fr' }) {
                 <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/50">DREAM LAB</p>
                 <h2 className="oracle-title mt-32 font-amiri text-4xl font-bold">{lang === 'ar' ? 'تفسير الأحلام' : 'Dream Interpretation'}</h2>
                 <p className="mt-3 max-w-sm text-sm leading-7 text-white/70">
-                    {lang === 'ar' ? 'تحليل نفسي ورمزي يربط المشاعر والذاكرة وضغط الحياة، بدون تنبؤات أو ادعاء معرفة الغيب.' : 'A psychological and symbolic reading grounded in emotion, memory, and daily stress.'}
+                    {lang === 'ar' ? 'تحليل مستنير بأبحاث النوم يربط محتوى الحلم بالذاكرة والانفعال وتجارب اليقظة، دون قاموس رموز ثابت.' : 'An evidence-informed analysis connecting dream content with memory, emotion, and waking experience.'}
                 </p>
             </section>
 
@@ -75,6 +75,7 @@ export default function DreamView({ lang }: { lang: 'ar' | 'en' | 'fr' }) {
                     <p className="whitespace-pre-line text-[15px] leading-8 text-[#e8dfeb]">{result}</p>
                 </motion.section>
             )}
+            <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3079906/" target="_blank" rel="noreferrer" className="block rounded-2xl border border-purple-100 bg-purple-50/70 p-4 text-xs leading-6 text-purple-800 underline">{lang === 'ar' ? 'المرجع العلمي: Memory, Sleep and Dreaming — NIH/PMC' : 'Research source: Memory, Sleep and Dreaming — NIH/PMC'}</a>
         </motion.div>
     );
 }

@@ -1,5 +1,10 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, getAuth, browserLocalPersistence } from 'firebase/auth';
+import {
+    initializeAuth,
+    getAuth,
+    browserLocalPersistence,
+    browserPopupRedirectResolver
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics, isSupported as isAnalyticsSupported, Analytics } from 'firebase/analytics';
 import { getRemoteConfig, fetchAndActivate, getValue, RemoteConfig } from 'firebase/remote-config';
@@ -14,6 +19,7 @@ let auth: ReturnType<typeof getAuth>;
 try {
     auth = initializeAuth(app, {
         persistence: browserLocalPersistence,
+        popupRedirectResolver: browserPopupRedirectResolver,
     });
 } catch (e) {
     // Already initialized (e.g. hot-reload)

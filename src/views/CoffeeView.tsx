@@ -6,20 +6,25 @@ import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { UserChronosMatrix } from '../utils/contextCollector';
 import { getApiUrl } from '../utils/api';
+import { compressReadingImage } from '../utils/imageCompression';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 export default function CoffeeView({ t, lang, state, setState }: any) {
     const { isScanning, imagePreview, reading } = state;
     const fileRef = useRef<HTMLInputElement>(null);
     const { user } = useAuth();
 
-    const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setState({ ...state, imagePreview: reader.result as string, reading: null });
-            };
-            reader.readAsDataURL(file);
+            try {
+                const image = await compressReadingImage(file, 1100, 0.72);
+                setState({ ...state, imagePreview: image, reading: null, isScanning: false });
+            } catch {
+                setState({ ...state, imagePreview: null, reading: lang === 'ar' ? 'تعذّر تجهيز الصورة. اختر صورة JPG أو PNG واضحة وحاول مجدداً.' : 'Could not prepare this image. Choose a clear JPG or PNG image.', isScanning: false });
+            } finally {
+                e.target.value = '';
+            }
         }
     };
 
@@ -42,18 +47,20 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
         setState({ ...state, isScanning: true, reading: null });
         
         try {
-            await new Promise(res => setTimeout(res, 1000));
-            
-            const res = await fetch(getApiUrl('/api/coffee'), {
+            const res = await fetchWithTimeout(getApiUrl('/api/coffee'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     image: imagePreview,
                     lang,
-                    deviceData: UserChronosMatrix.fingerprint
+                    deviceData: UserChronosMatrix.fingerprint,
+                    readingId: crypto.randomUUID()
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.reply || data.error || `HTTP ${res.status}`);
+            }
             
             if (data.reply && data.reply.trim() === 'ERROR_NOT_A_CUP') {
                  setState({ ...state, reading: lang === 'ar' ? "عذراً.. هذه الصورة لا تبدو كفنجان قهوة من الداخل. لا يمكن قراءة الطالع إلا بصورة واضحة لقعر الفنجان." : "Sorry.. this does not appear to be the inside of a coffee cup. The reading requires a clear picture of coffee grounds.", isScanning: false });
@@ -63,7 +70,11 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
                  saveResult(generatedReading);
             }
         } catch (err) {
-             setState({ ...state, reading: lang === 'ar' ? "تشويش في الاتصال الكوني... حاول مجددا." : "Cosmic interference... Try again.", isScanning: false });
+             const reason = err instanceof Error ? err.message : '';
+             const message = reason && !reason.startsWith('HTTP')
+                ? reason
+                : (lang === 'ar' ? 'تعذّر تحليل الفنجان الآن. تحقق من الاتصال ثم اضغط إعادة المحاولة.' : 'The cup could not be analyzed. Check your connection and retry.');
+             setState({ ...state, reading: message, isScanning: false });
         }
     };
 
@@ -187,6 +198,7 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
                         >
                             {lang === 'ar' ? 'قراءة فنجان جديد' : 'Read New Cup'}
                         </button>
+                        {imagePreview && <button onClick={() => setState({ ...state, reading: null, isScanning: false })} className="w-full border border-amber-300 text-amber-700 font-bold py-3 rounded-xl hover:bg-amber-50 transition-colors">{lang === 'ar' ? 'إعادة تحليل نفس الصورة' : 'Retry this image'}</button>}
                     </div>
                 </motion.div>
             )}

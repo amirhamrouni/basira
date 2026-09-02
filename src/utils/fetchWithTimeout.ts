@@ -1,9 +1,9 @@
 /**
  * fetchWithTimeout — bulletproof fetch wrapper with strict 8-second timeout.
- * Uses Promise.race to abort any hanging network request automatically.
+ * Allows enough time for substantial AI readings while still aborting hangs.
  */
 
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 60000;
 
 export class FetchTimeoutError extends Error {
     constructor(url: string) {
