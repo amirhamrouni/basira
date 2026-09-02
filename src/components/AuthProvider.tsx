@@ -3,12 +3,13 @@ import {
     User,
     onAuthStateChanged,
     signInWithPopup,
-    signInWithRedirect,
-    getRedirectResult,
+    signInWithCredential,
     GoogleAuthProvider,
     signOut,
     AuthError
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, db, analytics } from '../firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { logEvent } from 'firebase/analytics';
@@ -121,6 +122,11 @@ const getAuthErrorMessage = (error: AuthError, lang: string = 'ar'): string => {
             en: 'Google sign-in cannot start on this domain. Add the app domain to Firebase Authorized domains.',
             fr: 'La connexion Google ne peut pas démarrer sur ce domaine. Ajoutez-le aux domaines autorisés Firebase.'
         },
+        'auth/native-google-configuration': {
+            ar: 'تسجيل Google غير مهيأ لهذه النسخة. أضف تطبيق Android ‏com.basira.spiritportal وملف google-services.json وبصمة SHA-1 في Firebase ثم أعد بناء التطبيق.',
+            en: 'Google Sign-In is not configured for this build. Add the Android app, google-services.json and SHA-1 in Firebase, then rebuild.',
+            fr: 'Google Sign-In n’est pas configuré pour cette version Android.'
+        },
     };
     const msg = messages[error.code];
     if (msg) return msg[lang] || msg['ar'];
@@ -189,47 +195,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
-    // Complete a Google redirect login after returning to the application.
-    useEffect(() => {
-        getRedirectResult(auth).catch((error: AuthError) => {
-            console.error('Google redirect result error:', error.code, error.message);
-            const lang = AppStateManager.get('lang') || 'ar';
-            setAuthError(getAuthErrorMessage(error, lang));
-        });
-    }, []);
-
     const login = async () => {
         setAuthError(null);
         const lang = AppStateManager.get('lang') || 'ar';
         try {
-            await signInWithPopup(auth, provider);
+            if (Capacitor.isNativePlatform()) {
+                // Native Google flow: no browser redirect and no sessionStorage dependency.
+                const result = await FirebaseAuthentication.signInWithGoogle();
+                const idToken = result.credential?.idToken;
+                if (!idToken) throw Object.assign(new Error('Native Google Sign-In returned no ID token.'), { code: 'auth/native-google-configuration' });
+                const credential = GoogleAuthProvider.credential(idToken);
+                await signInWithCredential(auth, credential);
+            } else {
+                // Popup is reliable in standard browsers and keeps the OAuth state in one session.
+                await signInWithPopup(auth, provider);
+            }
             if (analytics) logEvent(analytics, 'login', { method: 'google' });
         } catch (error) {
             const authErr = error as AuthError;
             console.error('Login error:', authErr);
-            const redirectCodes = new Set([
-                'auth/popup-blocked',
+            const nativeSetupCodes = new Set([
                 'auth/operation-not-supported-in-this-environment',
-                'auth/argument-error'
+                'auth/developer-error',
+                'auth/configuration-not-found',
+                'auth/native-google-configuration'
             ]);
-            if (redirectCodes.has(authErr.code)) {
-                try {
-                    await signInWithRedirect(auth, provider);
-                    return;
-                } catch (redirectError) {
-                    const finalError = redirectError as AuthError;
-                    console.error('Google redirect start error:', finalError.code, finalError.message);
-                    setAuthError(getAuthErrorMessage(finalError, lang));
-                    return;
-                }
-            }
-            setAuthError(getAuthErrorMessage(authErr, lang));
+            const normalized = Capacitor.isNativePlatform() && (!authErr.code || nativeSetupCodes.has(authErr.code))
+                ? Object.assign(authErr, { code: 'auth/native-google-configuration' })
+                : authErr;
+            setAuthError(getAuthErrorMessage(normalized, lang));
         }
     };
 
     const logout = async () => {
         setAuthError(null);
         try {
+            if (Capacitor.isNativePlatform()) await FirebaseAuthentication.signOut();
             await signOut(auth);
         } catch (error) {
             console.error('Logout error:', error);

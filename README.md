@@ -45,3 +45,13 @@ Deploy the secured Firestore rules before production use:
 ```bash
 firebase deploy --only firestore:rules,firestore:indexes
 ```
+# Android Google Sign-In
+
+The Android app uses native Google Sign-In. Before building an APK/AAB:
+
+1. Register Android package `com.basira.spiritportal` in the Firebase project.
+2. Add the debug/release SHA-1 and SHA-256 fingerprints in Firebase Project Settings.
+3. Download the refreshed `google-services.json` and place it at `android/app/google-services.json`.
+4. Run `npm install`, `npx cap sync android`, then rebuild the app.
+
+Do not use `signInWithRedirect` inside the Capacitor WebView. Native Google Sign-In is bridged into the Firebase JavaScript session so Firestore continues to use the same authenticated user.

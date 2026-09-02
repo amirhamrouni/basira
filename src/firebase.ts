@@ -3,8 +3,10 @@ import {
     initializeAuth,
     getAuth,
     browserLocalPersistence,
+    indexedDBLocalPersistence,
     browserPopupRedirectResolver
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics, isSupported as isAnalyticsSupported, Analytics } from 'firebase/analytics';
 import { getRemoteConfig, fetchAndActivate, getValue, RemoteConfig } from 'firebase/remote-config';
@@ -17,10 +19,12 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 // Use browserLocalPersistence (IndexedDB) — works in Android WebView unlike sessionStorage
 let auth: ReturnType<typeof getAuth>;
 try {
-    auth = initializeAuth(app, {
-        persistence: browserLocalPersistence,
-        popupRedirectResolver: browserPopupRedirectResolver,
-    });
+    auth = Capacitor.isNativePlatform()
+        ? initializeAuth(app, { persistence: indexedDBLocalPersistence })
+        : initializeAuth(app, {
+            persistence: browserLocalPersistence,
+            popupRedirectResolver: browserPopupRedirectResolver,
+        });
 } catch (e) {
     // Already initialized (e.g. hot-reload)
     auth = getAuth(app);
