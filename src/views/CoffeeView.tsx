@@ -85,8 +85,8 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
 
             const generatedReading = typeof data.reply === 'string' ? data.reply.trim() : '';
             if (!generatedReading) throw new Error('Empty coffee reading');
-            setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
             await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
             await saveResult(generatedReading);
         } catch (err) {
             console.error('Coffee reading failed', err);
