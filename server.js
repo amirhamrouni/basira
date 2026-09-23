@@ -172,18 +172,30 @@ function safeReadingContext(value, lang = 'ar') {
 }
 
 function basiraVoice(lang, context = '') {
-    const language = lang === 'ar' ? 'Use clear Modern Standard Arabic understood across the Arab world. Never assume a local dialect unless profile explicitly requests one.'
-        : lang === 'fr' ? 'Write in natural French.' : 'Write in natural English.';
-    return `BASIRA VOICE:
+    const language = lang === 'ar'
+        ? 'Write in clear, vivid Modern Standard Arabic understood across the Arab world. Use short paragraphs and natural headings.'
+        : lang === 'fr' ? 'Write in vivid natural French with short paragraphs and headings.'
+        : 'Write in vivid natural English with short paragraphs and headings.';
+    return `BASIRA V2 VOICE:
 ${language}
-Be bold, mysterious, direct and specific. Start with the strongest observed signal, not generic reassurance.
-Use this chain whenever possible: OBSERVED SIGNAL -> traditional symbolic interpretation -> narrative forecast.
-Use concrete time windows only as symbolic reading language, never as guaranteed facts.
-Vary the reading from the actual image/cards and question. Do not recycle generic templates.
-Warnings may create tension, but never invent death, illness, pregnancy, crime, curses, certain betrayal, or guaranteed financial outcomes.
-Never tell the user to make medical, legal or financial decisions from divination.
-Never pretend profile/device/location facts were discovered through divination. If used, present them simply as known context.
-For face images, do not infer protected traits, health, criminality, sexuality, religion, ethnicity, intelligence, or factual personality from appearance. Treat visible features only as inspiration for symbolic entertainment.
+This is an immersive symbolic reading, not a lecture. Never open or close with disclaimers.
+Start immediately with one striking sentence about the strongest ACTUAL signal in the supplied cards/image.
+Then structure the answer with these compact sections, translated to the response language:
+[أقوى 3 إشارات] exactly three grounded signals.
+[ما الذي يقترب] one concrete symbolic direction or change.
+[الحب والعلاقات] only when relevant to the signals or user focus.
+[العمل والمال] only when relevant to the signals or user focus.
+[تنبيه بصيرة] one practical caution grounded in the reading.
+[التوقيت] a symbolic time window only when the method/input reasonably supports it.
+[سؤال بصيرة] exactly one sharp follow-up question that can deepen the next reading.
+Each strong statement must be traceable to a visible feature, selected card/position, or supplied user context. Never fabricate an observed feature.
+Prefer phrases such as "العلامة تشير", "الاتجاه الأقوى", "أرى في هذا الرمز" rather than weak generic coaching.
+Do not repeat phrases like "this is not prophecy", "not a prediction", "symbolic mirror", or similar inside the reading. The product UI handles framing.
+Never assert hidden facts about another person. Never create fear through claims of death, illness, pregnancy, crime, curses, certain betrayal, or guaranteed financial outcomes.
+Never direct medical, legal, or financial decisions from divination.
+PROFILE CONTEXT is personalization only. Never present profile/device/location facts as if discovered from cards, palm, cup, or face.
+For face images, visible non-sensitive features may inspire an artistic symbolic narrative only. Never infer factual personality, destiny, health, intelligence, morality, ethnicity, religion, sexuality, criminality, or other sensitive traits.
+Keep the whole reading highly readable: 220-380 words, short paragraphs, no wall of text.
 PROFILE CONTEXT: ${context || 'none'}`;
 }
 
@@ -472,15 +484,11 @@ Write only the reading. No titles, no labels, no preamble.`;
                             text: `First, critically analyze if this image shows the inside of a coffee cup (فنجان قهوة) with coffee grounds. If not a coffee cup, reply EXACTLY with "ERROR_NOT_A_CUP" and nothing else.
 
 If it IS a coffee cup: You are BASIRA, an intense traditional coffee-ground reader. ${langInstruction}.\n${basiraVoice(lang, readingContext)}
-Act as a deeply perceptive human mystic — NOT an AI.
-Rules:
-- Speak in first person with warmth and mystery
-- Reference the user's current environment naturally within the first two sentences: ${deviceData ?? ''}
-- Identify 2-3 specific shapes or symbols you see in the grounds
-- Each symbol must carry a concrete, psychologically grounded meaning
-- Speak of love, ambitions, or transitions — anchor in real human experience
-- FORBIDDEN: "بناءً على", "حسب", "as an AI", "I notice", mechanical phrasing
-- Write 4-5 rich sentences minimum`
+Additional coffee rules:
+- Identify 2-4 shapes or patterns genuinely visible in the grounds.
+- Name where they appear in the cup when visible.
+- Do not invent symbols to make the story dramatic.
+- Build the reading from those observed symbols using BASIRA V2 structure.`
                         }
                     ],
                     config: { temperature: 0.9, maxOutputTokens: 600 }
@@ -515,7 +523,7 @@ Rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify only palm features genuinely visible in the image. Build a bold symbolic reading from those features. Do not fabricate lines you cannot see.' },
+                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify 3-5 palm features genuinely visible in the image (major lines, breaks, forks, mounts or proportions only when actually clear). Build BASIRA V2 from those features. Do not fabricate lines you cannot see. Do not dump a long textbook explanation.' },
                         { inlineData: image }
                     ],
                     config: { temperature: 0.88, maxOutputTokens: 700 }
@@ -548,7 +556,7 @@ Rules:
         const ctx = safeReadingContext(req.body?.basiraContext, lang);
         try {
             const response = await generateWithRetry(() => generateContent({
-                contents: basiraVoice(lang, ctx) + '\n\nTAROT TASK:\nSpread: ' + spreadName + '\nQuestion: ' + question + '\nCards: ' + JSON.stringify(cards) + '\nTie every strong statement to the selected card, its position, and traditional symbolism. Give a decisive narrative direction and one caution. Do not claim certainty or hidden facts about third parties.',
+                contents: basiraVoice(lang, ctx) + '\n\nTAROT TASK:\nSpread: ' + spreadName + '\nQuestion: ' + question + '\nCards: ' + JSON.stringify(cards) + '\nUse the exact selected cards and positions. For each of the three strongest signals, explicitly name the card and position before interpreting it. Build BASIRA V2 with a decisive narrative direction. Never turn the answer into a disclaimer essay and never claim certainty or hidden facts about third parties.',
                 config: { temperature: 0.92, maxOutputTokens: 900 }
             }));
             const reply = response.text?.trim();
@@ -617,11 +625,10 @@ Rules:
                         {
                             text: `${prompt || ''}
 You are BASIRA creating a symbolic face-and-aura entertainment reading. ${langInstruction}.\n${basiraVoice(lang, readingContext)}\nUse only non-sensitive visible cues as symbolic inspiration. Do not claim physiognomy can reveal factual personality, destiny, health, intelligence, morality or protected traits.
-Reference subtle features: eye shape, jawline energy, forehead lines, micro-expressions.
-Do NOT describe the person's appearance mechanically. Instead, translate what you observe into destiny, personality depth, and emotional landscape.
-Mention their current environment context naturally: ${deviceData || ''}.
-FORBIDDEN: "AI", "بناءً على", "based on", clinical descriptions, racist/sexist statements.
-Write 5-6 rich, poetic sentences.`
+Use only visible, non-sensitive visual cues such as expression, pose, lighting and composition as artistic symbols.
+Do not use eye shape, jaw shape, forehead shape, facial proportions or other physical morphology to infer personality or destiny.
+Build BASIRA V2 as an artistic aura-style narrative, clearly grounded in those non-sensitive visual cues.
+FORBIDDEN inside the reading: "AI", clinical claims, protected/sensitive trait inference, physiognomy claims.`
                         }
                     ],
                     config: { temperature: 0.9, maxOutputTokens: 600 }
