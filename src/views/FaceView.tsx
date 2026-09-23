@@ -3,14 +3,16 @@ import { motion } from 'framer-motion';
 import { Camera, Image as ImageIcon, Sparkles, Loader } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { getApiUrl } from '../utils/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { compressReadingImage } from '../utils/imageCompression';
 import BasiraReadingText from '../components/BasiraReadingText';
+import CosmicRewardModal from '../components/CosmicRewardModal';
 
 export default function FaceView({ t, adminPrompt, lang, state, setState, basiraContext }: any) {
     const { imagePreview, reading, isScanning, error } = state;
+    const [showRewardModal, setShowRewardModal] = React.useState(false);
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -27,7 +29,7 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
         }
     };
 
-    const { user } = useAuth();
+    const { user, profile, login } = useAuth();
 
     const saveResult = async (resultText: string) => {
         if (!user) return;
@@ -44,6 +46,8 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
     };
 
     const analyzeFace = async (image: string) => {
+        if (!user || !profile) { login(); return; }
+        if (profile.energy < 15) { setShowRewardModal(true); return; }
         setState((current: any) => ({ ...current, imagePreview: image, isScanning: true, reading: null, error: null }));
         try {
             const response = await fetchWithTimeout(getApiUrl('/api/face'), {
@@ -68,6 +72,7 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
             if (!data.reply) throw new Error('Reading failed');
             const result = data.reply as string;
             setState((current: any) => ({ ...current, isScanning: false, reading: result, error: null }));
+            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
             await saveResult(result);
         } catch (cause) {
             console.error('Face reading failed', cause);
@@ -129,6 +134,7 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
                     {lang === 'ar' ? 'إعادة المحاولة بنفس الصورة' : lang === 'fr' ? 'Réessayer avec cette image' : 'Retry with this image'}
                 </button>
             )}
+            <CosmicRewardModal isOpen={showRewardModal} onClose={() => setShowRewardModal(false)} onRewardComplete={async () => { if (user) await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) }); setShowRewardModal(false); }} lang={lang} rewardType="insight" title={lang === 'ar' ? 'نفدت طاقتك الكونية' : 'Cosmic Energy Depleted'} description={lang === 'ar' ? 'تحتاج إلى 15 طاقة. أكمل خطوة الاستعادة للمتابعة.' : 'You need 15 Energy. Complete the recovery step to continue.'} />
         </motion.div>
     );
 }
