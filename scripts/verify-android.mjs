@@ -5,7 +5,7 @@ const required = [
   ['android/app/capacitor.build.gradle', "implementation project(':capacitor-firebase-authentication')"],
   ['android/app/src/main/java/com/basira/spiritportal/MainActivity.java', 'extends BridgeActivity'],
   ['capacitor.config.ts', "providers: ['google.com']"],
-  ['capacitor.config.ts', 'skipNativeAuth: true'],
+  ['capacitor.config.ts', 'skipNativeAuth: false'],
 ];
 
 let failed = false;
