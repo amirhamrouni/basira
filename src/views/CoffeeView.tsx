@@ -8,7 +8,7 @@ import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
-export default function CoffeeView({ t, lang, state, setState }: any) {
+export default function CoffeeView({ t, lang, state, setState , basiraContext}: any) {
     const { isScanning, imagePreview, reading, error } = state;
     const fileRef = useRef<HTMLInputElement>(null);
     const { user } = useAuth();
@@ -53,7 +53,7 @@ export default function CoffeeView({ t, lang, state, setState }: any) {
                     image: imagePreview,
                     lang,
                     readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`
-                })
+                , basiraContext})
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
