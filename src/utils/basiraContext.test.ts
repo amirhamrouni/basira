@@ -9,7 +9,7 @@ describe('sanitizeBasiraContext', () => {
   it('normalizes country codes and limits interests', () => {
     const value = sanitizeBasiraContext({
       preferredName: '  Amir  ',
-      birthDate: '1988-09-12-extra',
+      birthDate: '1988-09-12',
       originCountry: 'tn',
       residenceCountry: 'nl',
       language: 'ar',
@@ -26,8 +26,20 @@ describe('sanitizeBasiraContext', () => {
     expect(value.interests).toEqual(['love', 'money', 'work']);
   });
 
-  it('rejects unsupported language and reading style values', () => {
-    const value = sanitizeBasiraContext({ language: 'de', readingStyle: 'extreme' });
+  it('rejects malformed profile values', () => {
+    const value = sanitizeBasiraContext({
+      birthDate: '1988-09-12-extra',
+      birthTime: '99:99',
+      originCountry: 'tun',
+      interests: ['love', 'hacking', 'future'],
+      language: 'de',
+      readingStyle: 'extreme'
+    });
+
+    expect(value.birthDate).toBe('');
+    expect(value.birthTime).toBeUndefined();
+    expect(value.originCountry).toBeUndefined();
+    expect(value.interests).toEqual(['love', 'future']);
     expect(value.language).toBe('ar');
     expect(value.readingStyle).toBe('bold');
   });
