@@ -39,7 +39,8 @@ export function sanitizeBasiraContext(value: unknown): BasiraContext {
     return COUNTRY_CODE_RE.test(value) ? value : undefined;
   };
 
-  const birthDateCandidate = text('birthDate', 10);
+  const rawBirthDate = typeof raw.birthDate === 'string' ? raw.birthDate.trim() : '';
+  const birthDateCandidate = rawBirthDate.length === 10 ? rawBirthDate : '';
   const validDate = DATE_RE.test(birthDateCandidate) && (() => {
     const [year, month, day] = birthDateCandidate.split('-').map(Number);
     const parsed = new Date(Date.UTC(year, month - 1, day));
