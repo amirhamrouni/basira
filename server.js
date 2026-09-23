@@ -569,6 +569,43 @@ Additional coffee rules:
     });
 
     // ─────────────────────────────────────────────────────────────────────────
+    // ENDPOINT: /api/divination — Name-symbolism BASIRA reading
+    // ─────────────────────────────────────────────────────────────────────────
+    app.post('/api/divination', async (req, res) => {
+        const lang = safeLanguage(req.body?.lang);
+        if (!ai && !openai && !process.env.GROQ_API_KEY) {
+            return res.status(500).json({ error: 'API Key missing.', reply: getFallback(lang) });
+        }
+        const name = cleanText(req.body?.name, 80);
+        const motherName = cleanText(req.body?.motherName, 80);
+        if (!name || !motherName) return res.status(400).json({ error: 'Missing names' });
+
+        const humanName = /^[\\p{L}][\\p{L} .'-]{1,79}$/u;
+        if (!humanName.test(name) || !humanName.test(motherName)) {
+            return res.status(422).json({ error: 'INVALID_NAME', reply: 'ERROR_INVALID_NAME' });
+        }
+
+        const ctx = safeReadingContext(req.body?.basiraContext, lang);
+        const clientPrompt = cleanText(req.body?.prompt, 2500);
+        try {
+            const response = await generateWithRetry(() => generateContent({
+                contents: basiraVoice(lang, ctx) + `\n\nNAME SYMBOLISM TASK:
+Name: ${name}
+Mother name: ${motherName}
+${clientPrompt}
+Use traditional letter/name symbolism only as symbolic entertainment. Ground every pattern in the supplied names or profile context. Never invent hidden facts about the user or third parties.`,
+                config: { temperature: 0.88, maxOutputTokens: 800 }
+            }));
+            const reply = response.text?.trim();
+            if (!reply) throw new Error('Empty response');
+            return res.json({ reply });
+        } catch (e) {
+            console.error('[Divination API] Error:', e.message);
+            return res.status(503).json({ error: 'DIVINATION_UNAVAILABLE', reply: getFallback(lang) });
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ENDPOINT: /api/chat — General Divination/Tarot Chat
     // ─────────────────────────────────────────────────────────────────────────
     app.post('/api/chat', async (req, res) => {
