@@ -7,6 +7,7 @@ import { useAuth } from './components/AuthProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { cn } from './utils/cn';
 import { AppStateManager } from './utils/AppStateManager';
+import BasiraOnboarding from './components/BasiraOnboarding';
 
 type ViewId = 'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream' | 'privacy' | 'methodology' | 'moon' | 'dream-journal' | 'rituals';
 
@@ -96,6 +97,8 @@ export default function App() {
     return (
         <div className="oracle-app max-w-md mx-auto w-full min-h-screen pb-[calc(110px+env(safe-area-inset-bottom,0px))] relative font-tajawal shadow-2xl overflow-x-hidden selection:bg-stella-gold/30 ring-1 ring-[#d7ad58]/10">
             
+            {user && <BasiraOnboarding lang={lang} />}
+
             {/* Auth Error Banner */}
             <AnimatePresence>
                 {showAuthError && authError && (
