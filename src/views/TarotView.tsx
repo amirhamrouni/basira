@@ -8,6 +8,7 @@ import BasiraReadingText from '../components/BasiraReadingText';
 
 export default function TarotView({ lang, state, setState, basiraContext }: any) {
     const { drawnCards, reading, isLoading, sessionCards } = state;
+    const [error, setError] = useState('');
     const [question, setQuestion] = useState('');
     const [spreadId, setSpreadId] = useState('past-present-direction');
     const [followUp, setFollowUp] = useState('');
@@ -52,6 +53,7 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
         const allDrawn = [0, 1, 2];
         setFollowUp('');
         setFollowUpReply('');
+        setError('');
         setState({ ...state, drawnCards: allDrawn, isLoading: true, reading: null });
         const selected = cards.map((card, index) => ({ position: activeSpread.positions[index], name: card.name, nameAr: card.nameAr, theme: card.theme, reflection: card.reflection }));
         try {
@@ -64,6 +66,7 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
             if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: data.reply || buildLocalReading(cards, question, isAr) });
         } catch {
+            setError(isAr ? 'تعذّر الاتصال ببصيرة. هذه قراءة محلية مؤقتة ولم تُحفظ كقراءة AI.' : 'Basira could not be reached. Showing a temporary local reading.');
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: buildLocalReading(cards, question, isAr) });
         }
     };
@@ -145,6 +148,8 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
             </div>
 
             {!reading && <button onClick={draw} disabled={isLoading || cards.length < 3} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2a1c3b] to-[#78546f] py-4 font-bold text-white shadow-lg disabled:opacity-50"><Sparkles className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />{isLoading ? (isAr ? 'تُنسج القراءة...' : 'Weaving the reading...') : (isAr ? `اكشف البطاقة ${Math.min(drawnCards.length + 1, 3)}` : `Reveal card ${Math.min(drawnCards.length + 1, 3)}`)}</button>}
+
+            {error && <div role="alert" className="rounded-2xl border border-amber-400/30 bg-amber-950/20 p-3 text-sm text-amber-200">{error}</div>}
 
             {reading && <motion.section initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="oracle-frame rounded-[26px] p-5">
                 <div className="mb-4 flex items-center gap-2 text-[#f3d994]"><Sparkles className="h-5 w-5" /><h3 className="font-amiri text-2xl font-bold">{isAr ? 'ما تكشفه البطاقات' : 'What the cards reveal'}</h3></div>
