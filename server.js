@@ -618,11 +618,12 @@ Use traditional letter/name symbolism only as symbolic entertainment. Ground eve
             const lang = safeLanguage(req.body?.lang);
             const prompt = cleanText(req.body?.prompt, 3000);
             const context = cleanText(req.body?.context, 2000);
+            const readingContext = safeReadingContext(req.body?.basiraContext, lang);
             if (!prompt) return res.status(400).json({ error: 'Missing prompt', reply: getFallback(lang) });
 
             const response = await generateWithRetry(() =>
                 generateContent({
-                    contents: `${context || ''}\n\nUser: ${prompt}`,
+                    contents: `${basiraVoice(lang, readingContext)}\n\nFOLLOW-UP CONTEXT:\n${context || ''}\n\nUser: ${prompt}`,
                     config: { temperature: 0.85, maxOutputTokens: 800 }
                 })
             );
