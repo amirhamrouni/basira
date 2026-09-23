@@ -8,7 +8,7 @@ import { getApiUrl } from '../utils/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { compressReadingImage } from '../utils/imageCompression';
 
-export default function FaceView({ t, adminPrompt, lang, state, setState }: any) {
+export default function FaceView({ t, adminPrompt, lang, state, setState , basiraContext}: any) {
     const { imagePreview, reading, isScanning, error } = state;
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,7 +53,7 @@ export default function FaceView({ t, adminPrompt, lang, state, setState }: any)
                     prompt: adminPrompt,
                     lang,
                     readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`
-                })
+                , basiraContext})
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
