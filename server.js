@@ -158,6 +158,35 @@ async function generateWithRetry(callFn, maxRetries = 3) {
     throw lastError;
 }
 
+
+function safeReadingContext(value, lang = 'ar') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+    const allowed = ['preferredName','birthDate','birthTime','birthCity','birthCountry','originCountry','residenceCountry','dialect','readingStyle','interests'];
+    const clean = {};
+    for (const key of allowed) {
+        const v = value[key];
+        if (typeof v === 'string') clean[key] = v.trim().slice(0, 100);
+        else if (key === 'interests' && Array.isArray(v)) clean[key] = v.filter(x => typeof x === 'string').slice(0, 3);
+    }
+    return Object.keys(clean).length ? JSON.stringify(clean) : '';
+}
+
+function basiraVoice(lang, context = '') {
+    const language = lang === 'ar' ? 'Use clear Modern Standard Arabic understood across the Arab world. Never assume a local dialect unless profile explicitly requests one.'
+        : lang === 'fr' ? 'Write in natural French.' : 'Write in natural English.';
+    return `BASIRA VOICE:
+${language}
+Be bold, mysterious, direct and specific. Start with the strongest observed signal, not generic reassurance.
+Use this chain whenever possible: OBSERVED SIGNAL -> traditional symbolic interpretation -> narrative forecast.
+Use concrete time windows only as symbolic reading language, never as guaranteed facts.
+Vary the reading from the actual image/cards and question. Do not recycle generic templates.
+Warnings may create tension, but never invent death, illness, pregnancy, crime, curses, certain betrayal, or guaranteed financial outcomes.
+Never tell the user to make medical, legal or financial decisions from divination.
+Never pretend profile/device/location facts were discovered through divination. If used, present them simply as known context.
+For face images, do not infer protected traits, health, criminality, sexuality, religion, ethnicity, intelligence, or factual personality from appearance. Treat visible features only as inspiration for symbolic entertainment.
+PROFILE CONTEXT: ${context || 'none'}`;
+}
+
 // ─── Server ───────────────────────────────────────────────────────────────────
 
 async function startServer() {
@@ -427,6 +456,7 @@ Write only the reading. No titles, no labels, no preamble.`;
         try {
             const lang = safeLanguage(req.body?.lang);
             const deviceData = cleanText(req.body?.deviceData, 800);
+            const readingContext = safeReadingContext(req.body?.basiraContext, lang);
             const image = parseImageDataUrl(req.body?.image);
             if (!image) return res.status(400).json({ error: 'Invalid or oversized image', reply: getFallback(lang) });
 
@@ -441,7 +471,7 @@ Write only the reading. No titles, no labels, no preamble.`;
                         {
                             text: `First, critically analyze if this image shows the inside of a coffee cup (فنجان قهوة) with coffee grounds. If not a coffee cup, reply EXACTLY with "ERROR_NOT_A_CUP" and nothing else.
 
-If it IS a coffee cup: You are an elite Chaldæan coffee-ground reader. ${langInstruction}.
+If it IS a coffee cup: You are BASIRA, an intense traditional coffee-ground reader. ${langInstruction}.\n${basiraVoice(lang, readingContext)}
 Act as a deeply perceptive human mystic — NOT an AI.
 Rules:
 - Speak in first person with warmth and mystery
@@ -459,6 +489,7 @@ Rules:
 
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
+            if (reply === 'ERROR_NOT_A_CUP' || reply.startsWith('ERROR_NOT_A_CUP')) return res.status(422).json({ error: 'NOT_A_CUP' });
             return res.json({ reply });
         } catch (e) {
             console.error('[Coffee API] Error:', e.message);
@@ -484,7 +515,7 @@ Rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { text: (context || '') + '\n\n' + (prompt || '') },
+                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify only palm features genuinely visible in the image. Build a bold symbolic reading from those features. Do not fabricate lines you cannot see.' },
                         { inlineData: image }
                     ],
                     config: { temperature: 0.88, maxOutputTokens: 700 }
@@ -497,6 +528,34 @@ Rules:
         } catch (e) {
             console.error('[Palmistry API] Error:', e.message);
             const lang = req.body?.lang || 'ar';
+            return res.status(503).json({ error: e.message, reply: getFallback(lang) });
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENDPOINT: /api/tarot — Card-grounded BASIRA reading
+    // ─────────────────────────────────────────────────────────────────────────
+    app.post('/api/tarot', async (req, res) => {
+        const lang = safeLanguage(req.body?.lang);
+        if (!ai && !openai && !process.env.GROQ_API_KEY) return res.status(500).json({ error: 'API Key missing.', reply: getFallback(lang) });
+        const cards = Array.isArray(req.body?.cards) ? req.body.cards.slice(0, 5).map(c => ({
+            position: cleanText(c?.position, 80), name: cleanText(c?.name, 80), nameAr: cleanText(c?.nameAr, 80),
+            theme: cleanText(c?.theme, 300), reflection: cleanText(c?.reflection, 500)
+        })) : [];
+        if (!cards.length) return res.status(400).json({ error: 'Missing cards' });
+        const question = cleanText(req.body?.question, 500);
+        const spreadName = cleanText(req.body?.spreadName, 100);
+        const ctx = safeReadingContext(req.body?.basiraContext, lang);
+        try {
+            const response = await generateWithRetry(() => generateContent({
+                contents: basiraVoice(lang, ctx) + '\n\nTAROT TASK:\nSpread: ' + spreadName + '\nQuestion: ' + question + '\nCards: ' + JSON.stringify(cards) + '\nTie every strong statement to the selected card, its position, and traditional symbolism. Give a decisive narrative direction and one caution. Do not claim certainty or hidden facts about third parties.',
+                config: { temperature: 0.92, maxOutputTokens: 900 }
+            }));
+            const reply = response.text?.trim();
+            if (!reply) throw new Error('Empty response');
+            return res.json({ reply });
+        } catch (e) {
+            console.error('[Tarot API] Error:', e.message);
             return res.status(503).json({ error: e.message, reply: getFallback(lang) });
         }
     });
@@ -543,6 +602,7 @@ Rules:
             const lang = safeLanguage(req.body?.lang);
             const prompt = cleanText(req.body?.prompt, 3000);
             const deviceData = cleanText(req.body?.deviceData, 800);
+            const readingContext = safeReadingContext(req.body?.basiraContext, lang);
             const image = parseImageDataUrl(req.body?.image);
             if (!image) return res.status(400).json({ error: 'Invalid or oversized image', reply: getFallback(lang) });
 
@@ -556,8 +616,7 @@ Rules:
                         { inlineData: image },
                         {
                             text: `${prompt || ''}
-You are a master physiognomist and aura reader. ${langInstruction}.
-Analyze the face in the image with deep psychological and energetic insight.
+You are BASIRA creating a symbolic face-and-aura entertainment reading. ${langInstruction}.\n${basiraVoice(lang, readingContext)}\nUse only non-sensitive visible cues as symbolic inspiration. Do not claim physiognomy can reveal factual personality, destiny, health, intelligence, morality or protected traits.
 Reference subtle features: eye shape, jawline energy, forehead lines, micro-expressions.
 Do NOT describe the person's appearance mechanically. Instead, translate what you observe into destiny, personality depth, and emotional landscape.
 Mention their current environment context naturally: ${deviceData || ''}.
