@@ -8,6 +8,7 @@ import { logEvent } from 'firebase/analytics';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 import BasiraReadingText from '../components/BasiraReadingText';
 import { getApiUrl } from '../utils/api';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 export default function DivinationView({ t, adminPrompt, lang, state, setState }: any) {
     const { name, motherName, reading, isLoading } = state;
@@ -43,7 +44,7 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
             const basiraContext = profile?.basiraContext || null;
             const contextJson = basiraContext ? JSON.stringify(basiraContext) : 'none';
 
-            const res = await fetch(getApiUrl('/api/divination'), {
+            const res = await fetchWithTimeout(getApiUrl('/api/divination'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -55,15 +56,16 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                     prompt: `Validate that both values look like plausible human names. If either is clearly gibberish, reply exactly ERROR_INVALID_NAME. Otherwise create a BASIRA V2 symbolic name/numerology reading. Use حساب الجمل / traditional name symbolism only as symbolic entertainment, not as scientific fact. Start with the strongest pattern from the two names, then use short sections: [أقوى 3 إشارات], [ما الذي يقترب], [الحب والعلاقات] when relevant, [العمل والمال] when relevant, [تنبيه بصيرة], [التوقيت] when appropriate, [سؤال بصيرة]. Tie claims to the actual names or supplied profile context. Do not invent hidden facts, do not claim certainty, and do not repeat disclaimers inside the reading. Write in ${lang === 'ar' ? 'clear Modern Standard Arabic' : lang === 'fr' ? 'natural French' : 'natural English'}.`
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
 
             if (!res.ok && data.error !== 'INVALID_NAME') throw new Error(data.error || `HTTP ${res.status}`);
 
             if (data.error === 'INVALID_NAME' || (data.reply && data.reply.trim() === 'ERROR_INVALID_NAME')) {
                 setState({ ...state, reading: lang === 'ar' ? 'الأسماء المدخلة غير واضحة كأسماء حقيقية. راجعها وحاول من جديد.' : 'The entered names do not look like valid human names. Please check them and try again.', isLoading: false });
             } else {
+                if (!data.reply || typeof data.reply !== 'string') throw new Error('Empty divination reading');
                 await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
-                setState({ ...state, reading: data.reply || (lang === 'ar' ? 'تعذّرت القراءة الآن. حاول مرة أخرى.' : 'Reading failed. Try again.'), isLoading: false });
+                setState({ ...state, reading: data.reply.trim(), isLoading: false });
                 if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'divination' });
             }
         } catch (err) {
