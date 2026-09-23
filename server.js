@@ -532,6 +532,7 @@ Additional coffee rules:
 
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
+            if (reply === 'ERROR_NOT_A_PALM' || reply.startsWith('ERROR_NOT_A_PALM')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE' });
             return res.json({ reply });
         } catch (e) {
             console.error('[Palmistry API] Error:', e.message);
