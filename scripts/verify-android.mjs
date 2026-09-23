@@ -23,6 +23,12 @@ for (const [file, needle] of required) {
   }
 }
 
+if (process.argv.includes('--structure-only')) {
+  if (failed) process.exit(1);
+  console.log('ANDROID AUTH STRUCTURE GATE: PASS');
+  process.exit(0);
+}
+
 const googleServices = 'android/app/google-services.json';
 if (!fs.existsSync(googleServices)) {
   console.error('FAIL missing google-services.json. Native Google Sign-In cannot be accepted without it.');
