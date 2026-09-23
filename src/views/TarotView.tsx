@@ -5,7 +5,7 @@ import { tarotDeck, TarotCard } from '../data/tarotDeck';
 import { getApiUrl } from '../utils/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
-export default function TarotView({ lang, state, setState }: any) {
+export default function TarotView({ lang, state, setState, basiraContext }: any) {
     const { drawnCards, reading, isLoading, sessionCards } = state;
     const [question, setQuestion] = useState('');
     const [spreadId, setSpreadId] = useState('past-present-direction');
@@ -57,7 +57,8 @@ export default function TarotView({ lang, state, setState }: any) {
                     lang,
                     spreadName: activeSpread.name,
                     positions: activeSpread.positions,
-                    readingId: crypto.randomUUID()
+                    readingId: crypto.randomUUID(),
+                    basiraContext
                 })
             });
             const data = await response.json();
