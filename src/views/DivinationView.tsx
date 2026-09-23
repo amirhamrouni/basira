@@ -85,7 +85,8 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                     context: `PROFILE CONTEXT: ${profile?.basiraContext ? JSON.stringify(profile.basiraContext) : 'none'}`
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
             setFollowUpReply(data.reply || (lang === 'ar' ? 'تعذّر تعميق القراءة الآن.' : 'Could not deepen the reading right now.'));
         } catch {
             setFollowUpReply(lang === 'ar' ? 'تعذّر تعميق القراءة الآن.' : 'Could not deepen the reading right now.');
