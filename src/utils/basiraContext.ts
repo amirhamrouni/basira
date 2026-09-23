@@ -40,7 +40,8 @@ export function sanitizeBasiraContext(value: unknown): BasiraContext {
   };
 
   const birthDateCandidate = text('birthDate', 10);
-  const birthDate = DATE_RE.test(birthDateCandidate) ? birthDateCandidate : '';
+  const validDate = DATE_RE.test(birthDateCandidate) && !Number.isNaN(Date.parse(`${birthDateCandidate}T00:00:00Z`));
+  const birthDate = validDate ? birthDateCandidate : '';
   const birthTimeCandidate = text('birthTime', 5);
   const birthTime = TIME_RE.test(birthTimeCandidate) ? birthTimeCandidate : undefined;
 
