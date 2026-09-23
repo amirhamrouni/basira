@@ -5,10 +5,16 @@ import { tarotDeck, TarotCard } from '../data/tarotDeck';
 import { getApiUrl } from '../utils/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import BasiraReadingText from '../components/BasiraReadingText';
+import { useAuth } from '../components/AuthProvider';
+import { db } from '../firebase';
+import { doc, updateDoc, increment } from 'firebase/firestore';
+import CosmicRewardModal from '../components/CosmicRewardModal';
 
 export default function TarotView({ lang, state, setState, basiraContext }: any) {
     const { drawnCards, reading, isLoading, sessionCards } = state;
     const [error, setError] = useState('');
+    const [showRewardModal, setShowRewardModal] = useState(false);
+    const { user, profile, login } = useAuth();
     const [question, setQuestion] = useState('');
     const [spreadId, setSpreadId] = useState('past-present-direction');
     const [followUp, setFollowUp] = useState('');
@@ -46,6 +52,8 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
     const cards = useMemo(() => sessionCards.map((id: string) => tarotDeck.find(card => card.id === id)).filter(Boolean) as TarotCard[], [sessionCards]);
 
     const draw = async () => {
+        if (!user || !profile) { login(); return; }
+        if (profile.energy < 15) { setShowRewardModal(true); return; }
         if (drawnCards.length < 2) {
             setState({ ...state, drawnCards: [...drawnCards, drawnCards.length] });
             return;
@@ -64,7 +72,9 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-            setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: data.reply || buildLocalReading(cards, question, isAr) });
+            const generated = data.reply || buildLocalReading(cards, question, isAr);
+            setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: generated });
+            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
         } catch {
             setError(isAr ? 'تعذّر الاتصال ببصيرة. هذه قراءة محلية مؤقتة ولم تُحفظ كقراءة AI.' : 'Basira could not be reached. Showing a temporary local reading.');
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: buildLocalReading(cards, question, isAr) });
@@ -164,6 +174,7 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
             </motion.section>}
 
             <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-[11px] leading-5 text-gray-500"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" /><p>{isAr ? 'صور Rider–Waite–Smith الأصلية (Pamela Colman Smith، 1910) من Wikimedia Commons. القراءة تستخدم الرموز التقليدية كأداة سرد وتأمل، والقرار يبقى لك.' : 'Original Rider–Waite–Smith art (Pamela Colman Smith, 1910) via Wikimedia Commons. The reading uses traditional symbolism as a reflective narrative tool; your decisions remain your own.'} <a className="font-bold text-purple-700 underline" href="https://commons.wikimedia.org/wiki/Category:Rider-Waite_tarot_deck" target="_blank" rel="noreferrer">{isAr ? 'المصدر' : 'Source'}</a></p></div>
+            <CosmicRewardModal isOpen={showRewardModal} onClose={() => setShowRewardModal(false)} onRewardComplete={async () => { if (user) await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) }); setShowRewardModal(false); }} lang={lang} rewardType="insight" title={isAr ? 'نفدت طاقتك الكونية' : 'Cosmic Energy Depleted'} description={isAr ? 'تحتاج إلى 15 طاقة. أكمل خطوة الاستعادة للمتابعة.' : 'You need 15 Energy. Complete the recovery step to continue.'} />
         </motion.div>
     );
 }
