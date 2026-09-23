@@ -43,4 +43,8 @@ describe('sanitizeBasiraContext', () => {
     expect(value.language).toBe('ar');
     expect(value.readingStyle).toBe('bold');
   });
+
+  it('rejects impossible calendar dates', () => {
+    expect(sanitizeBasiraContext({ birthDate: '2026-02-31' }).birthDate).toBe('');
+  });
 });
