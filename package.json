@@ -12,7 +12,9 @@
     "android:sync": "npm run build && npx cap sync android",
     "start": "node server.js",
     "preview": "vite preview",
-    "render-build": "npm install && npm run build"
+    "render-build": "npm install && npm run build",
+    "verify:android": "node scripts/verify-android.mjs",
+    "android:debug": "npm run check && npx cap sync android && npm run verify:android && cd android && gradlew assembleDebug"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
