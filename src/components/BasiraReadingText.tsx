@@ -1,6 +1,6 @@
 import React from 'react';
 
-const HEADING_RE = /^\s*[\[【](.+?)[\]】]\s*$/;
+const HEADING_RE = /^\s*(?:#{1,4}\s*)?(?:\*\*)?[\[【](.+?)[\]】](?:\*\*)?\s*[:：]?\s*$/;
 
 export function parseBasiraReading(text: string) {
   const lines = String(text || '').split(/\r?\n/);
@@ -8,7 +8,10 @@ export function parseBasiraReading(text: string) {
   let current: { title?: string; body: string[] } = { body: [] };
 
   const pushCurrent = () => {
-    if (current.title || current.body.some(line => line.trim())) sections.push(current);
+    const body = [...current.body];
+    while (body.length && !body[0].trim()) body.shift();
+    while (body.length && !body[body.length - 1].trim()) body.pop();
+    if (current.title || body.some(line => line.trim())) sections.push({ ...current, body });
   };
 
   for (const raw of lines) {
@@ -35,12 +38,12 @@ export default function BasiraReadingText({ text, dark = false }: { text: string
   return (
     <div className="space-y-3">
       {sections.map((section, index) => (
-        <div key={`${section.title || 'intro'}-${index}`} className={`rounded-2xl border px-4 py-3 ${sectionClass}`}>
+        <section key={`${section.title || 'intro'}-${index}`} className={`rounded-2xl border px-4 py-3 ${sectionClass}`}>
           {section.title && <h4 className={`mb-2 font-amiri text-lg font-bold ${titleClass}`}>{section.title}</h4>}
           <div className={`whitespace-pre-line font-tajawal text-[15px] leading-8 ${bodyClass}`}>
             {section.body.join('\n').trim()}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );
