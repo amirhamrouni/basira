@@ -35,7 +35,8 @@ export function sanitizeBasiraContext(value: unknown): BasiraContext {
   const readingStyle: ReadingStyle = raw.readingStyle === 'calm' || raw.readingStyle === 'direct' ? raw.readingStyle : 'bold';
 
   const country = (key: string) => {
-    const value = text(key, 2).toUpperCase();
+    const rawValue = typeof raw[key] === 'string' ? String(raw[key]).trim().toUpperCase() : '';
+    const value = rawValue.length === 2 ? rawValue : '';
     return COUNTRY_CODE_RE.test(value) ? value : undefined;
   };
 
