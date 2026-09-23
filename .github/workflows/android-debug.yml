@@ -1,8 +1,6 @@
 name: BASIRA Android Debug APK
 
 on:
-  push:
-    branches: [feat/basira-context-engine]
   workflow_dispatch:
 
 jobs:
@@ -23,8 +21,8 @@ jobs:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.BASIRA_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "::warning::Firebase config unavailable; native Google Login cannot be validated in this APK."
-            exit 0
+            echo "::error::Private Firebase configuration is required for an installable auth build."
+            exit 1
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           node -e "const c=require('./android/app/google-services.json').client; if(!c.some(x=>x.client_info?.android_client_info?.package_name==='com.basira.spiritportal'))process.exit(1)"
@@ -33,8 +31,7 @@ jobs:
           npm install --no-audit --no-fund --legacy-peer-deps
           npm run check
           npx cap sync android
-          npm run verify:android:structure
-          if [ -s android/app/google-services.json ]; then npm run verify:android; fi
+          npm run verify:android
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --console=plain
@@ -51,13 +48,3 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
-      - name: Package Gradle dependencies for offline build
-        if: success()
-        run: |
-          tar -czf gradle-build-cache.tar.gz -C "$HOME" .gradle/wrapper/dists .gradle/caches/modules-2 .gradle/caches/8.14.3
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: basira-gradle-cache
-          path: gradle-build-cache.tar.gz
-          retention-days: 2
