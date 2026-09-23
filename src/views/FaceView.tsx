@@ -71,8 +71,8 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
             }
             if (!data.reply) throw new Error('Reading failed');
             const result = data.reply as string;
-            setState((current: any) => ({ ...current, isScanning: false, reading: result, error: null }));
             await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            setState((current: any) => ({ ...current, isScanning: false, reading: result, error: null }));
             await saveResult(result);
         } catch (cause) {
             console.error('Face reading failed', cause);
