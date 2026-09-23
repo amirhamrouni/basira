@@ -33,7 +33,7 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
             return;
         }
 
-        setState({ ...state, isLoading: true });
+        setState({ ...state, isLoading: true, reading: null });
         setFollowUp('');
         setFollowUpReply('');
 
