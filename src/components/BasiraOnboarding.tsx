@@ -8,6 +8,7 @@ export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
   const { user, profile } = useAuth();
   const [form, setForm] = useState<BasiraContext>({ ...DEFAULT_BASIRA_CONTEXT, language: lang, preferredName: user?.displayName?.split(' ')[0] || '' });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   if (!user || profile?.onboardingCompleted) return null;
 
   const labels = lang === 'ar'
@@ -35,6 +36,7 @@ export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
   const save = async () => {
     if (!form.preferredName.trim()) return;
     setSaving(true);
+    setSaveError('');
     try {
       const cleanForm = {
         ...form,
@@ -44,6 +46,9 @@ export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
         language: lang
       };
       await setDoc(doc(db,'users',user.uid), { basiraContext: cleanForm, onboardingCompleted:true, contextUpdatedAt:serverTimestamp() }, { merge:true });
+    } catch (error) {
+      console.error('Onboarding save failed', error);
+      setSaveError(lang === 'ar' ? 'تعذّر حفظ معلوماتك. تحقق من الاتصال وحاول مجدداً.' : lang === 'fr' ? 'Impossible d’enregistrer vos informations. Vérifiez la connexion et réessayez.' : 'Could not save your information. Check your connection and try again.');
     } finally { setSaving(false); }
   };
 
@@ -61,7 +66,8 @@ export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
       </div>
       <p className="text-sm text-white/70">{labels.focus}</p>
       <div className="grid grid-cols-3 gap-2">{interests.map(([value,label])=><button type="button" key={value} onClick={()=>toggleInterest(value)} className={`rounded-xl border p-3 text-sm transition ${form.interests.includes(value)?'border-stella-gold bg-stella-gold/15 text-stella-gold':'border-white/10 text-white/60'}`}>{label}</button>)}</div>
-      <button disabled={saving || !form.preferredName.trim()} onClick={save} className="w-full rounded-2xl bg-stella-gold p-4 font-bold text-[#171022] disabled:opacity-50">{saving?'...':labels.save}</button>
+      {saveError && <div role="alert" className="rounded-2xl border border-red-400/30 bg-red-950/30 p-3 text-sm text-red-200">{saveError}</div>}
+      <button disabled={saving || !form.preferredName.trim() || !form.birthDate} onClick={save} className="w-full rounded-2xl bg-stella-gold p-4 font-bold text-[#171022] disabled:opacity-50">{saving?'...':labels.save}</button>
       <p className="text-[11px] leading-5 text-white/40">{labels.note}</p>
     </div>
   </div>;
