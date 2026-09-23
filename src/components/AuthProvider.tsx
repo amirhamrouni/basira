@@ -202,6 +202,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const lang = AppStateManager.get('lang') || 'ar';
         try {
             if (Capacitor.isNativePlatform()) {
+                if (!Capacitor.isPluginAvailable('FirebaseAuthentication')) {
+                    throw Object.assign(new Error('FirebaseAuthentication native plugin is unavailable in this APK.'), { code: 'auth/native-google-configuration' });
+                }
                 // Native Google flow: no browser redirect and no sessionStorage dependency.
                 const result = await FirebaseAuthentication.signInWithGoogle();
                 // With skipNativeAuth=false the native plugin already signs Firebase in.
