@@ -81,6 +81,7 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     lang,
+                    basiraContext: profile?.basiraContext || null,
                     prompt: `Previous BASIRA reading:\n${reading}\n\nUser follow-up answer/question:\n${followUp.trim()}\n\nGive a deeper second-layer reading. Do not repeat the first reading. Resolve the user's answer against the strongest earlier signals, add one new concrete symbolic interpretation, one caution, and end with one sharper question. Keep it concise and readable.`,
                     context: `PROFILE CONTEXT: ${profile?.basiraContext ? JSON.stringify(profile.basiraContext) : 'none'}`
                 })
