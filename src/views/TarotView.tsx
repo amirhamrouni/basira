@@ -87,7 +87,7 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
                 <div className="absolute right-6 top-5 text-6xl text-[#d9b96e]/10">✦</div>
                 <p className="text-[10px] font-bold uppercase tracking-[.28em] text-[#d9b96e]">RIDER–WAITE–SMITH • MAJOR ARCANA</p>
                 <h2 className="oracle-title mt-3 font-amiri text-4xl font-bold">{isAr ? 'أسرار التاروت' : 'Tarot Secrets'}</h2>
-                <p className="mt-3 max-w-sm text-sm leading-7 text-white/65">{isAr ? 'قراءة رمزية للسؤال والماضي والحاضر والاتجاه القادم—ليست حكماً على المستقبل.' : 'A symbolic past, present and direction reading grounded in your real question.'}</p>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-white/65">{isAr ? 'ثلاث بطاقات. ثلاث إشارات. بصيرة تربطها بسؤالك وتكشف لك الاتجاه الأقوى.' : 'A symbolic past, present and direction reading grounded in your real question.'}</p>
             </section>
 
             <section className="oracle-frame rounded-[24px] p-5">
@@ -146,5 +146,5 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
 
 function buildLocalReading(cards: TarotCard[], question: string, isAr: boolean) {
     if (!isAr) return cards.map((card, i) => `${['Past','Present','Direction'][i]} — ${card.name}: ${card.reflection}.`).join('\n\n') + `\n\nReflect on what small action is supported by these themes${question ? ` in relation to “${question}”` : ''}.`;
-    return cards.map((card, i) => `${['الماضي','الحاضر','الاتجاه'][i]} — ${card.nameAr}: ${card.reflection}.`).join('\n\n') + `\n\nالخلاصة: لا تخبرك البطاقات بما سيحدث؛ هي تجمع ثلاث زوايا تساعدك على سؤال نفسك: ما الخطوة الصغيرة التي تنسجم مع هذه المعاني${question ? ` في موضوع «${question}»` : ''}؟`;
+    return cards.map((card, i) => `${['الماضي','الحاضر','الاتجاه'][i]} — ${card.nameAr}: ${card.reflection}.`).join('\n\n') + `\n\nالخلاصة: البطاقات الثلاث ترسم اتجاهاً رمزياً واحداً: راقب ما يتكرر أمامك، ثم اختر خطوتك بوعي.''}؟`;
 }
