@@ -18,14 +18,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
       - name: Restore Firebase Android configuration
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.BASIRA_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "::error::BASIRA_GOOGLE_SERVICES_JSON_BASE64 repository secret is required."
-            exit 1
+            echo "::warning::Firebase config unavailable; native Google Login cannot be validated in this APK."
+            exit 0
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           node -e "const c=require('./android/app/google-services.json').client; if(!c.some(x=>x.client_info?.android_client_info?.package_name==='com.basira.spiritportal'))process.exit(1)"
@@ -34,7 +33,8 @@ jobs:
           npm install --no-audit --no-fund --legacy-peer-deps
           npm run check
           npx cap sync android
-          npm run verify:android
+          npm run verify:android:structure
+          if [ -s android/app/google-services.json ]; then npm run verify:android; fi
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --console=plain
