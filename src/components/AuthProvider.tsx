@@ -3,6 +3,7 @@ import {
     User,
     onAuthStateChanged,
     signInWithPopup,
+    signInWithCredential,
     GoogleAuthProvider,
     signOut,
     AuthError
@@ -205,11 +206,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (!Capacitor.isPluginAvailable('FirebaseAuthentication')) {
                     throw Object.assign(new Error('FirebaseAuthentication native plugin is unavailable in this APK.'), { code: 'auth/native-google-configuration' });
                 }
-                // Native Google flow: no browser redirect and no sessionStorage dependency.
-                const result = await FirebaseAuthentication.signInWithGoogle();
-                // With skipNativeAuth=false the native plugin already signs Firebase in.
-                // Avoid signing the same credential into the JS SDK a second time.
-                if (!result.user) throw Object.assign(new Error('Native Google Sign-In returned no Firebase user.'), { code: 'auth/native-google-configuration' });
+                // Native provider returns the Google credential; Firebase JS SDK remains
+                // the source of truth for this React app and its onAuthStateChanged listener.
+                const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+                const idToken = result.credential?.idToken;
+                const accessToken = result.credential?.accessToken;
+                if (!idToken) throw Object.assign(new Error('Native Google Sign-In returned no ID token.'), { code: 'auth/native-google-configuration' });
+                const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
+                await signInWithCredential(auth, credential);
             } else {
                 // Popup is reliable in standard browsers and keeps the OAuth state in one session.
                 await signInWithPopup(auth, provider);
