@@ -3,8 +3,9 @@ import fs from 'node:fs';
 const required = [
   ['android/capacitor.settings.gradle', "include ':capacitor-firebase-authentication'"],
   ['android/app/capacitor.build.gradle', "implementation project(':capacitor-firebase-authentication')"],
-  ['android/app/src/main/java/com/basira/spiritportal/MainActivity.java', 'FirebaseAuthenticationPlugin.class'],
+  ['android/app/src/main/java/com/basira/spiritportal/MainActivity.java', 'extends BridgeActivity'],
   ['capacitor.config.ts', "providers: ['google.com']"],
+  ['capacitor.config.ts', 'skipNativeAuth: true'],
 ];
 
 let failed = false;
