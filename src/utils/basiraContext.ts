@@ -40,7 +40,11 @@ export function sanitizeBasiraContext(value: unknown): BasiraContext {
   };
 
   const birthDateCandidate = text('birthDate', 10);
-  const validDate = DATE_RE.test(birthDateCandidate) && !Number.isNaN(Date.parse(`${birthDateCandidate}T00:00:00Z`));
+  const validDate = DATE_RE.test(birthDateCandidate) && (() => {
+    const [year, month, day] = birthDateCandidate.split('-').map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+  })();
   const birthDate = validDate ? birthDateCandidate : '';
   const birthTimeCandidate = text('birthTime', 5);
   const birthTime = TIME_RE.test(birthTimeCandidate) ? birthTimeCandidate : undefined;
