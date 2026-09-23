@@ -27,6 +27,8 @@ export interface UserProfile {
     displayName?: string;
     email?: string;
     photoURL?: string;
+    onboardingCompleted?: boolean;
+    basiraContext?: import('../utils/basiraContext').BasiraContext;
 }
 
 interface AuthContextType {
@@ -73,7 +75,8 @@ const ensureUserProfile = async (currentUser: User) => {
                 xp: 0,
                 streak: 1,
                 vipStatus: 'none',
-                role: 'user'
+                role: 'user',
+                onboardingCompleted: false
             });
             if (analytics) logEvent(analytics, 'sign_up');
         } else {
