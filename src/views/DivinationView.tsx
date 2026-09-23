@@ -6,6 +6,7 @@ import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db, analytics } from '../firebase';
 import { logEvent } from 'firebase/analytics';
 import CosmicRewardModal from '../components/CosmicRewardModal';
+import BasiraReadingText from '../components/BasiraReadingText';
 import { getApiUrl } from '../utils/api';
 
 export default function DivinationView({ t, adminPrompt, lang, state, setState }: any) {
@@ -38,7 +39,6 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
 
         try {
             await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
-
             if (analytics) logEvent(analytics, 'ai_reading_started', { type: 'divination' });
 
             const basiraContext = profile?.basiraContext || null;
@@ -134,8 +134,8 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                         <Scroll className="text-stella-gold w-6 h-6" />
                         <h3 className="text-stella-gold font-bold text-lg font-amiri">{lang === 'ar' ? 'قراءة بصيرة' : 'Basira Reading'}</h3>
                     </div>
-                    <div className="glass-card p-6 bg-white border border-gray-100 shadow-sm relative overflow-hidden rounded-[30px]">
-                        <p className="text-gray-700 text-base md:text-lg leading-[2] whitespace-pre-wrap font-tajawal relative z-10">{reading}</p>
+                    <div className="glass-card p-4 bg-white border border-gray-100 shadow-sm relative overflow-hidden rounded-[30px]">
+                        <BasiraReadingText text={reading} />
                     </div>
 
                     <div className="mt-5 rounded-3xl border border-stella-gold/20 bg-white p-5 shadow-sm">
@@ -144,7 +144,7 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                         <button onClick={submitFollowUp} disabled={!followUp.trim() || followUpLoading} className="mt-3 w-full rounded-xl bg-stella-gold py-3.5 font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2">
                             <Send size={18} />{followUpLoading ? '...' : (lang === 'ar' ? 'قراءة أعمق' : 'Go deeper')}
                         </button>
-                        {followUpReply && <div className="mt-4 rounded-2xl bg-stella-gold/5 p-4 text-gray-700 leading-8 whitespace-pre-wrap font-tajawal">{followUpReply}</div>}
+                        {followUpReply && <div className="mt-4"><BasiraReadingText text={followUpReply} /></div>}
                     </div>
 
                     <button onClick={() => { setState({ name: '', motherName: '', reading: null, isLoading: false }); setFollowUp(''); setFollowUpReply(''); }} className="w-full mt-8 border-2 border-stella-gold/30 text-stella-gold font-bold py-4 rounded-xl hover:bg-stella-gold/5 transition-all text-lg font-amiri tracking-wide">
