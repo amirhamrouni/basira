@@ -1,5 +1,3 @@
-import React from 'react';
-
 const HEADING_RE = /^\s*(?:#{1,4}\s*)?(?:\*\*)?[\[【](.+?)[\]】](?:\*\*)?\s*[:：]?\s*$/;
 
 export function parseBasiraReading(text: string) {
