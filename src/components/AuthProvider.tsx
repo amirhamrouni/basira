@@ -126,17 +126,16 @@ const getAuthErrorMessage = (error: AuthError, lang: string = 'ar'): string => {
             fr: 'La connexion Google ne peut pas démarrer sur ce domaine. Ajoutez-le aux domaines autorisés Firebase.'
         },
         'auth/native-google-configuration': {
-            ar: 'تعذّر تشغيل إضافة Google الأصلية في هذه النسخة.',
-            en: 'The native Google authentication plugin is unavailable in this build.',
-            fr: 'Le module natif Google est indisponible dans cette version.'
+            ar: 'تسجيل Google غير مهيأ لهذه النسخة. أضف تطبيق Android ‏com.basira.spiritportal وملف google-services.json وبصمة SHA-1 في Firebase ثم أعد بناء التطبيق.',
+            en: 'Google Sign-In is not configured for this build. Add the Android app, google-services.json and SHA-1 in Firebase, then rebuild.',
+            fr: 'Google Sign-In n’est pas configuré pour cette version Android.'
         },
     };
     const msg = messages[error.code];
     if (msg) return msg[lang] || msg['ar'];
-    const detail = [error.code, error.message].filter(Boolean).join(' · ');
     return lang === 'ar'
-        ? `خطأ تسجيل Google: ${detail || 'خطأ غير معروف'}`
-        : `Google login error: ${detail || 'Unknown error'}`;
+        ? `خطأ في تسجيل الدخول: ${error.message}`
+        : `Login error: ${error.message}`;
 };
 
 import { AppStateManager } from '../utils/AppStateManager';
@@ -202,12 +201,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const lang = AppStateManager.get('lang') || 'ar';
         try {
             if (Capacitor.isNativePlatform()) {
-                if (!Capacitor.isPluginAvailable('FirebaseAuthentication')) {
-                    throw Object.assign(new Error('FirebaseAuthentication native plugin is unavailable in this APK.'), { code: 'auth/native-google-configuration' });
-                }
                 const result = await FirebaseAuthentication.signInWithGoogle();
                 const idToken = result.credential?.idToken;
-                if (!idToken) throw Object.assign(new Error('Native Google Sign-In returned no ID token.'), { code: 'auth/missing-google-id-token' });
+                if (!idToken) throw Object.assign(new Error('Native Google Sign-In returned no ID token.'), { code: 'auth/native-google-configuration' });
                 const credential = GoogleAuthProvider.credential(idToken);
                 await signInWithCredential(auth, credential);
             } else {
@@ -217,7 +213,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error) {
             const authErr = error as AuthError;
             console.error('Login error:', authErr);
-            setAuthError(getAuthErrorMessage(authErr, lang));
+            const nativeSetupCodes = new Set([
+                'auth/operation-not-supported-in-this-environment',
+                'auth/developer-error',
+                'auth/configuration-not-found',
+                'auth/native-google-configuration'
+            ]);
+            const normalized = Capacitor.isNativePlatform() && (!authErr.code || nativeSetupCodes.has(authErr.code))
+                ? Object.assign(authErr, { code: 'auth/native-google-configuration' })
+                : authErr;
+            setAuthError(getAuthErrorMessage(normalized, lang));
         }
     };
 
