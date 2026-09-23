@@ -11,7 +11,7 @@ import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
-export default function PalmistryView({ t, adminPrompt, lang, state, setState }: any) {
+export default function PalmistryView({ t, adminPrompt, lang, state, setState , basiraContext}: any) {
     const { isScanning, imagePreview, reading, error } = state;
     const fileRef = useRef<HTMLInputElement>(null);
     const { user, profile, login } = useAuth();
@@ -78,7 +78,7 @@ If it IS a valid human palm, provide a substantial palmistry interpretation in $
                     imageBuffer: imagePreview,
                     lang,
                     readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`
-                })
+                , basiraContext})
             });
             const data = await res.json().catch(() => ({}));
             
