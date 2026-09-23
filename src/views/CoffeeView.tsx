@@ -3,16 +3,18 @@ import { motion } from 'framer-motion';
 import { Coffee, CheckCircle2, Share2, Save } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import BasiraReadingText from '../components/BasiraReadingText';
+import CosmicRewardModal from '../components/CosmicRewardModal';
 
 export default function CoffeeView({ t, lang, state, setState, basiraContext }: any) {
     const { isScanning, imagePreview, reading, error } = state;
     const fileRef = useRef<HTMLInputElement>(null);
-    const { user } = useAuth();
+    const { user, profile, login } = useAuth();
+    const [showRewardModal, setShowRewardModal] = React.useState(false);
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -44,6 +46,8 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
 
     const triggerScan = async () => {
         if (!imagePreview) return;
+        if (!user || !profile) { login(); return; }
+        if (profile.energy < 15) { setShowRewardModal(true); return; }
         setState((current: any) => ({ ...current, isScanning: true, reading: null, error: null }));
 
         try {
@@ -82,6 +86,7 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
             const generatedReading = typeof data.reply === 'string' ? data.reply.trim() : '';
             if (!generatedReading) throw new Error('Empty coffee reading');
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
+            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
             await saveResult(generatedReading);
         } catch (err) {
             console.error('Coffee reading failed', err);
@@ -149,6 +154,7 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
                     </div>
                 </motion.div>
             )}
+            <CosmicRewardModal isOpen={showRewardModal} onClose={() => setShowRewardModal(false)} onRewardComplete={async () => { if (user) await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) }); setShowRewardModal(false); }} lang={lang} rewardType="insight" title={lang === 'ar' ? 'نفدت طاقتك الكونية' : 'Cosmic Energy Depleted'} description={lang === 'ar' ? 'تحتاج إلى 15 طاقة. أكمل خطوة الاستعادة للمتابعة.' : 'You need 15 Energy. Complete the recovery step to continue.'} />
         </motion.div>
     );
 }
