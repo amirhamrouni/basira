@@ -73,8 +73,8 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
             const generated = data.reply || buildLocalReading(cards, question, isAr);
-            setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: generated });
             await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: generated });
         } catch {
             setError(isAr ? 'تعذّر الاتصال ببصيرة. هذه قراءة محلية مؤقتة ولم تُحفظ كقراءة AI.' : 'Basira could not be reached. Showing a temporary local reading.');
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: buildLocalReading(cards, question, isAr) });
