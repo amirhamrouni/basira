@@ -91,8 +91,8 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                 return;
             }
 
+            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
-            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) }).catch(persistenceError => console.error('Failed to update palmistry energy', persistenceError));
             await saveResult(generatedReading);
             if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'palmistry' });
         } catch (err) {
