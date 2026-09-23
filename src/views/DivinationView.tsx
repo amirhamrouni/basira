@@ -38,7 +38,6 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
         setFollowUpReply('');
 
         try {
-            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
             if (analytics) logEvent(analytics, 'ai_reading_started', { type: 'divination' });
 
             const basiraContext = profile?.basiraContext || null;
@@ -58,16 +57,17 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
             });
             const data = await res.json();
 
-            if (data.reply && data.reply.trim() === 'ERROR_INVALID_NAME') {
+            if (!res.ok && data.error !== 'INVALID_NAME') throw new Error(data.error || `HTTP ${res.status}`);
+
+            if (data.error === 'INVALID_NAME' || (data.reply && data.reply.trim() === 'ERROR_INVALID_NAME')) {
                 setState({ ...state, reading: lang === 'ar' ? 'الأسماء المدخلة غير واضحة كأسماء حقيقية. راجعها وحاول من جديد.' : 'The entered names do not look like valid human names. Please check them and try again.', isLoading: false });
-                await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) });
             } else {
+                await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
                 setState({ ...state, reading: data.reply || (lang === 'ar' ? 'تعذّرت القراءة الآن. حاول مرة أخرى.' : 'Reading failed. Try again.'), isLoading: false });
                 if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'divination' });
             }
         } catch (err) {
             setState({ ...state, reading: lang === 'ar' ? 'انقطع الاتصال أثناء القراءة.' : 'Connection lost during the reading.', isLoading: false });
-            await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) });
             if (analytics) logEvent(analytics, 'ai_reading_failed', { type: 'divination' });
         }
     };
