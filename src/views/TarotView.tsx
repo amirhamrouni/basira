@@ -96,6 +96,7 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     lang,
+                    basiraContext,
                     context: `PROFILE CONTEXT: ${basiraContext ? JSON.stringify(basiraContext) : 'none'}\nCARDS: ${JSON.stringify(selected)}`,
                     prompt: `Previous reading:\n${reading}\n\nUser follow-up:\n${followUp.trim()}\n\nGo one layer deeper without repeating the first reading. Tie the answer back to the actual selected cards and positions, add one new concrete interpretation and one caution, then end with one sharper question. Keep it concise.`
                 })
