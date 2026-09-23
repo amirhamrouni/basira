@@ -214,11 +214,11 @@ export default function App() {
                         <AnimatePresence mode="wait">
                             {activeView === 'home' && <HomeView key="home" t={t} onNavigate={setActiveView} lang={lang} />}
                             {activeView === 'zodiac' && <ZodiacView key="zodiac" t={t} lang={lang} />}
-                            {activeView === 'palmistry' && <PalmistryView key="palm" t={t} adminPrompt={adminPrompt} lang={lang} state={palmState} setState={setPalmState} />}
-                            {activeView === 'face' && <FaceView key="face" t={t} adminPrompt={adminPrompt} lang={lang} state={faceState} setState={setFaceState} />}
-                            {activeView === 'tarot' && <TarotView key="tarot" t={t} adminPrompt={adminPrompt} lang={lang} state={tarotState} setState={setTarotState} />}
+                            {activeView === 'palmistry' && <PalmistryView key="palm" t={t} adminPrompt={adminPrompt} lang={lang} basiraContext={profile?.basiraContext} state={palmState} setState={setPalmState} />}
+                            {activeView === 'face' && <FaceView key="face" t={t} adminPrompt={adminPrompt} lang={lang} basiraContext={profile?.basiraContext} state={faceState} setState={setFaceState} />}
+                            {activeView === 'tarot' && <TarotView key="tarot" t={t} adminPrompt={adminPrompt} lang={lang} basiraContext={profile?.basiraContext} state={tarotState} setState={setTarotState} />}
                             {activeView === 'divination' && <DivinationView key="divination" t={t} adminPrompt={adminPrompt} lang={lang} state={divState} setState={setDivState} />}
-                            {activeView === 'coffee' && <CoffeeView key="coffee" t={t} lang={lang} state={coffeeState} setState={setCoffeeState} />}
+                            {activeView === 'coffee' && <CoffeeView key="coffee" t={t} lang={lang} basiraContext={profile?.basiraContext} state={coffeeState} setState={setCoffeeState} />}
                             {activeView === 'premium' && <PremiumView key="premium" t={t} lang={lang} />}
                             {activeView === 'notifications' && <NotificationsView key="notifications" t={t} lang={lang} />}
                             {activeView === 'other' && <OtherView key="other" t={t} lang={lang} onNavigate={setActiveView} />}
