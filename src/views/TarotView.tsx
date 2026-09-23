@@ -60,7 +60,8 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ cards: selected, question, lang, spreadName: activeSpread.name, positions: activeSpread.positions, readingId: crypto.randomUUID(), basiraContext })
             });
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: data.reply || buildLocalReading(cards, question, isAr) });
         } catch {
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: buildLocalReading(cards, question, isAr) });
@@ -96,7 +97,8 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
                     prompt: `Previous reading:\n${reading}\n\nUser follow-up:\n${followUp.trim()}\n\nGo one layer deeper without repeating the first reading. Tie the answer back to the actual selected cards and positions, add one new concrete interpretation and one caution, then end with one sharper question. Keep it concise.`
                 })
             });
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
             setFollowUpReply(data.reply || (isAr ? 'تعذّر تعميق القراءة الآن.' : 'Could not deepen the reading right now.'));
         } catch {
             setFollowUpReply(isAr ? 'تعذّر تعميق القراءة الآن.' : 'Could not deepen the reading right now.');
