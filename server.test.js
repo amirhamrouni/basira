@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanText, parseImageDataUrl, safeLanguage, symbolicNamePattern } from './server.js';
+import { cleanText, parseImageDataUrl, safeLanguage, symbolicNamePattern, startWithStrongSignals } from './server.js';
 
 describe('API input validation', () => {
     it('accepts only supported languages', () => {
@@ -28,5 +28,11 @@ describe('API input validation', () => {
         expect(result.motherSum).toBe(41);
         expect(result.combinedRoot).toBe(4);
         expect(symbolicNamePattern('احمد', 'ام')).toEqual(result);
+    });
+
+    it('starts a cup reading at its actual signals when the model adds an introduction', () => {
+        const response = 'نعم، تظهر الصورة داخل فنجان قهوة.\n\n[أقوى 3 إشارات]\n1. رواسب في القاع';
+        expect(startWithStrongSignals(response)).toBe('[أقوى 3 إشارات]\n1. رواسب في القاع');
+        expect(startWithStrongSignals('ERROR_NOT_A_CUP')).toBe('ERROR_NOT_A_CUP');
     });
 });

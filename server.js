@@ -59,6 +59,14 @@ export function cleanText(value, maxLength = 4000) {
     return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
+export function startWithStrongSignals(reply) {
+    const marker = '[أقوى 3 إشارات]';
+    const index = reply.indexOf(marker);
+    // Vision models occasionally announce that a picture contains a palm/cup
+    // before the reading. The observation belongs inside the signals section.
+    return index > 0 && index < 500 ? reply.slice(index) : reply;
+}
+
 export function parseImageDataUrl(value) {
     if (typeof value !== 'string') return null;
     const match = value.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
@@ -199,7 +207,7 @@ function basiraVoice(lang, context = '', memory = 'none') {
 ${language}
 This is an immersive symbolic reading, not a lecture. Never open or close with disclaimers.
 Write the headings EXACTLY in brackets, each on its own line. No introduction before the first heading. Short sentences, no dense paragraphs:
-[أقوى 3 إشارات] exactly THREE numbered lines. Each line: what is ACTUALLY visible (or the card and its position / deterministic name value) → traditional symbolic meaning → how it connects to a second actual signal. Put the strongest first. Never invent a visual mark. If fewer than three independent signals are discernible, say so and do not invent a third.
+[أقوى 3 إشارات] up to THREE numbered lines. Each line: what is ACTUALLY visible (or the card and its position / deterministic name value) → traditional symbolic meaning → how it connects to a second actual signal. Put the strongest first. Never invent a visual mark. If fewer than three independent signals are discernible, say so and do not invent another.
 [ما يقترب] the strongest CONDITIONAL scenario and a distinct second scenario if the user's choice changes or delays. Say what observable choice changes the path. Two or three specific details must be supported by the actual inputs, not generic surprises.
 [التوقيت] one symbolic window (days, weeks or 1–3 months) only as an interpretive device; identify the signal that motivates the window. No certain dates or guarantees.
 [تنبيه / فرصة] one practical caution or opportunity tied to the signals, with no fear tactics.
@@ -543,7 +551,7 @@ Additional coffee rules:
             if (!reply) throw new Error('Empty response');
             if (reply === 'ERROR_NOT_A_CUP' || reply.startsWith('ERROR_NOT_A_CUP')) return res.status(422).json({ error: 'NOT_A_CUP' });
             if (reply.startsWith('ERROR_CUP_GROUNDS_UNREADABLE')) return res.status(422).json({ error: 'NOT_A_CUP', reply: lang === 'ar' ? 'الفنجان ظاهر، لكن علامات البنّ ما تتقراش في الصورة. صوّر داخل الفنجان بإضاءة أوضح.' : 'The cup is visible, but the grounds are not readable. Photograph the inside in clearer light.' });
-            return res.json({ reply });
+            return res.json({ reply: startWithStrongSignals(reply) });
         } catch (e) {
             console.error('[Coffee API] Error:', e.message);
             const lang = req.body?.lang || 'ar';
@@ -579,7 +587,7 @@ Additional coffee rules:
             if (!reply) throw new Error('Empty response');
             if (reply === 'ERROR_NOT_A_PALM' || reply.startsWith('ERROR_NOT_A_PALM')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE' });
             if (reply.startsWith('ERROR_PALM_LINES_UNREADABLE')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE', reply: lang === 'ar' ? 'راحة اليد ظاهرة، لكن الخطوط ما تتقراش في الصورة. صوّرها بإضاءة أمامية أوضح.' : 'Your palm is visible, but its lines are not readable. Take another photo in brighter front light.' });
-            return res.json({ reply });
+            return res.json({ reply: startWithStrongSignals(reply) });
         } catch (e) {
             console.error('[Palmistry API] Error:', e.message);
             const lang = req.body?.lang || 'ar';
