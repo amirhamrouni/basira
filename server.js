@@ -214,6 +214,7 @@ PROFILE CONTEXT is personalization only. Never present profile/device/location f
 For face images, visible non-sensitive features may inspire an artistic symbolic narrative only. Never infer factual personality, destiny, health, intelligence, morality, ethnicity, religion, sexuality, criminality, or other sensitive traits.
 Keep the whole reading 140–220 words, with no paragraph longer than two short sentences.
 RECENT READINGS (user's own saved history; do not claim divination revealed it): ${memory}. Do not reuse their openings, scenarios or stock wording. If a previous direction is relevant, state what NEW evidence changes it.
+When RECENT READINGS is not none, vary the wording and symbolic relationship of EACH of the three signal lines; never copy a previous line even when the same cards or signs recur. Use the user's new question to narrow the interpretation. In [ما يقترب], explicitly compare the old direction with what the new input supports. If the input adds no new evidence, say the symbolic direction remains the same instead of inventing a new development.
 PROFILE CONTEXT: ${context || 'none'}`;
 }
 
