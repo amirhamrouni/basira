@@ -69,3 +69,9 @@ export function sanitizeBasiraContext(value: unknown): BasiraContext {
       : [],
   };
 }
+
+/** Firestore rejects undefined values, including optional profile fields. */
+export function toFirestoreBasiraContext(value: unknown, language: BasiraContext['language']): Record<string, string | string[]> {
+  const clean = sanitizeBasiraContext({ ...(value && typeof value === 'object' ? value : {}), language });
+  return Object.fromEntries(Object.entries(clean).filter(([, field]) => field !== undefined)) as Record<string, string | string[]>;
+}
