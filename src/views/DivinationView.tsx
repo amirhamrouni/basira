@@ -10,6 +10,7 @@ import CosmicRewardModal from '../components/CosmicRewardModal';
 import BasiraReadingText from '../components/BasiraReadingText';
 import { getApiUrl } from '../utils/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { saveMeteredReading } from '../utils/freeReadings';
 
 export default function DivinationView({ t, adminPrompt, lang, state, setState }: any) {
     const { name, motherName, reading, isLoading } = state;
@@ -66,7 +67,7 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                 setState({ ...state, reading: lang === 'ar' ? 'الأسماء المدخلة غير واضحة كأسماء حقيقية. راجعها وحاول من جديد.' : 'The entered names do not look like valid human names. Please check them and try again.', isLoading: false });
             } else {
                 if (!data.reply || typeof data.reply !== 'string') throw new Error('Empty divination reading');
-                await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+                await saveMeteredReading(db, user.uid, 'divination', data.reply.trim());
                 rememberReading(user.uid, 'divination', data.reply.trim());
                 setState({ ...state, reading: data.reply.trim(), isLoading: false });
                 if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'divination' });
