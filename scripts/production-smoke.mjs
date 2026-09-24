@@ -50,7 +50,7 @@ console.log(`FOLLOW-UP (${second?.length} chars):\n${second}`);
 if (!second || second.length < 130 || second === first) throw new Error('Follow-up missing or identical');
 if (!/تدريب|نقل|مدين|أسبوع|عرض/.test(second)) throw new Error('Follow-up did not incorporate new answer');
 
-const memory = [{ type: 'tarot', signals: first.slice(0, 270), direction: first.slice(270, 420) }];
+const memory = [{ type: 'tarot', signals: first.match(/\[أقوى 3 إشارات\]([^[]*)/)?.[1]?.slice(0, 700), direction: first.match(/\[ما يقترب\]([^[]*)/)?.[1]?.slice(0, 160) }];
 const third = (await request('/api/tarot', { lang: 'ar', spreadName: 'ثلاث بطاقات', question: 'بعد التدريب، أين أركز جهدي الآن؟', cards, recentReadings: memory })).reply;
 verify(third, 'MEMORY READING');
 if (third === first) throw new Error('Reading repeated verbatim despite memory');
