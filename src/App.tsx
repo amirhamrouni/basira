@@ -79,7 +79,7 @@ export default function App() {
             const media = event.data;
             if (!event.success || !media?.uri) return;
             try {
-                const image = await compressNativeImage(Capacitor.convertFileSrc(media.uri));
+                const image = await compressNativeImage(Capacitor.convertFileSrc(media.uri), kind);
                 if (!active) return;
                 if (kind === 'palmistry') setPalmState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));
                 else if (kind === 'face') setFaceState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));

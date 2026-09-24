@@ -6,11 +6,11 @@ export type ReadingImageKind = 'palmistry' | 'face' | 'coffee';
 export const PENDING_IMAGE_KEY = 'basira_pending_reading_image';
 const NativePhotoPicker = registerPlugin<{ pickPhoto(options: { source: 'camera' | 'gallery' }): Promise<{ uri?: string }> }>('BasiraPhotoPicker');
 
-export async function compressNativeImage(webPath: string): Promise<string> {
+export async function compressNativeImage(webPath: string, kind: ReadingImageKind = 'face'): Promise<string> {
     const response = await fetch(webPath);
     if (!response.ok) throw new Error('Could not load selected photo');
     const blob = await response.blob();
-    return compressReadingImage(new File([blob], 'reading.jpg', { type: blob.type || 'image/jpeg' }));
+    return compressReadingImage(new File([blob], 'reading.jpg', { type: blob.type || 'image/jpeg' }), kind === 'palmistry' ? 1600 : 1152, kind === 'palmistry' ? 0.86 : 0.8);
 }
 
 export async function pickNativeReadingImage(kind: ReadingImageKind, source: 'camera' | 'gallery'): Promise<string | null> {
@@ -19,7 +19,7 @@ export async function pickNativeReadingImage(kind: ReadingImageKind, source: 'ca
     try {
         const media = await NativePhotoPicker.pickPhoto({ source });
         if (!media?.uri) return null;
-        return await compressNativeImage(Capacitor.convertFileSrc(media.uri));
+        return await compressNativeImage(Capacitor.convertFileSrc(media.uri), kind);
     } finally {
         localStorage.removeItem(PENDING_IMAGE_KEY);
     }
