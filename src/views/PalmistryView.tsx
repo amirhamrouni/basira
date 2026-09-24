@@ -8,6 +8,7 @@ import { doc, updateDoc, increment } from 'firebase/firestore';
 import { logEvent } from 'firebase/analytics';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 import BasiraReadingText from '../components/BasiraReadingText';
+import { shareReading } from '../utils/shareResult';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -102,17 +103,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
         }
     };
 
-    const handleShare = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({ title: lang === 'ar' ? 'قراءتي من بصيرة' : 'My Basira Palm Reading', text: reading });
-            } catch (err) {
-                console.error('Error sharing', err);
-            }
-        } else {
-            alert(lang === 'ar' ? 'المشاركة غير مدعومة في متصفحك' : 'Sharing is not supported in this browser');
-        }
-    };
+    const handleShare = () => shareReading(lang === 'ar' ? 'قراءتي من بصيرة' : 'My Basira Palm Reading', reading);
 
     return (
         <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col items-center w-full">

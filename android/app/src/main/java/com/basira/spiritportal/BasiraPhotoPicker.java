@@ -2,6 +2,7 @@ package com.basira.spiritportal;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.ClipData;
 import android.net.Uri;
 import android.provider.MediaStore;
 import android.graphics.Bitmap;
@@ -35,6 +36,7 @@ public class BasiraPhotoPicker extends Plugin {
                 Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
                 Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                 intent.putExtra(MediaStore.EXTRA_OUTPUT, uri);
+                intent.setClipData(ClipData.newRawUri("Basira photo", uri));
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                 startActivityForResult(call, intent, "photoResult");
             } else {
