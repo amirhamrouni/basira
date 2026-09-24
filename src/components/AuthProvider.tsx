@@ -36,6 +36,7 @@ interface AuthContextType {
     profile: UserProfile | null;
     loading: boolean;
     authError: string | null;
+    profileError: string | null;
     isAdmin: boolean;
     login: () => Promise<void>;
     logout: () => Promise<void>;
@@ -46,6 +47,7 @@ const AuthContext = createContext<AuthContextType>({
     profile: null,
     loading: true,
     authError: null,
+    profileError: null,
     isAdmin: false,
     login: async () => {},
     logout: async () => {},
@@ -145,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
+    const [profileError, setProfileError] = useState<string | null>(null);
     const [serverAdmin, setServerAdmin] = useState(false);
 
     useEffect(() => {
@@ -160,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             setAuthError(null);
+            setProfileError(null);
 
             if (currentUser) {
                 if (analytics) logEvent(analytics, 'login', { method: 'google' });
@@ -168,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     await ensureUserProfile(currentUser);
                 } catch (error) {
                     console.error('Profile setup failed:', error);
+                    setProfileError((error as { code?: string }).code || 'unknown');
                 }
 
                 const userRef = doc(db, 'users', currentUser.uid);
@@ -176,10 +181,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     (snapshot) => {
                         if (snapshot.exists()) {
                             setProfile(snapshot.data() as UserProfile);
+                            setProfileError(null);
                         }
                     },
                     (error) => {
                         console.error('Profile sync error:', error);
+                        setProfileError(error.code || 'unknown');
                     }
                 );
             } else {
@@ -237,7 +244,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, profile, loading, authError, isAdmin: serverAdmin || profile?.role === 'admin', login, logout }}>
+        <AuthContext.Provider value={{ user, profile, loading, authError, profileError, isAdmin: serverAdmin || profile?.role === 'admin', login, logout }}>
             {children}
         </AuthContext.Provider>
     );

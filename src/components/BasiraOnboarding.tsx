@@ -5,7 +5,7 @@ import { useAuth } from './AuthProvider';
 import { BasiraContext, DEFAULT_BASIRA_CONTEXT, toFirestoreBasiraContext } from '../utils/basiraContext';
 
 export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
-  const { user, profile } = useAuth();
+  const { user, profile, profileError } = useAuth();
   const [form, setForm] = useState<BasiraContext>({ ...DEFAULT_BASIRA_CONTEXT, language: lang, preferredName: user?.displayName?.split(' ')[0] || '' });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -42,7 +42,15 @@ export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
       await setDoc(doc(db,'users',user.uid), { basiraContext: cleanForm, onboardingCompleted:true, contextUpdatedAt:serverTimestamp() }, { merge:true });
     } catch (error) {
       console.error('Onboarding save failed', error);
-      setSaveError(lang === 'ar' ? 'تعذّر حفظ معلوماتك. تحقق من الاتصال وحاول مجدداً.' : lang === 'fr' ? 'Impossible d’enregistrer vos informations. Vérifiez la connexion et réessayez.' : 'Could not save your information. Check your connection and try again.');
+      const code = typeof (error as { code?: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : 'unknown';
+      const message = code === 'permission-denied'
+        ? (lang === 'ar' ? 'الخادم رفض حفظ معلوماتك بسبب صلاحيات قاعدة البيانات.' : lang === 'fr' ? 'La base de données a refusé cet enregistrement.' : 'The database denied permission to save your information.')
+        : code === 'unavailable' || code === 'deadline-exceeded'
+          ? (lang === 'ar' ? 'قاعدة البيانات غير متاحة الآن. تحقق من الاتصال وحاول مجدداً.' : lang === 'fr' ? 'La base de données est indisponible. Réessayez.' : 'Database unavailable. Check your connection and retry.')
+          : (lang === 'ar' ? 'تعذّر حفظ معلوماتك.' : lang === 'fr' ? 'Impossible d’enregistrer vos informations.' : 'Could not save your information.');
+      setSaveError(`${message} [${code}]`);
     } finally { setSaving(false); }
   };
 
@@ -60,7 +68,7 @@ export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
       </div>
       <p className="text-sm text-white/70">{labels.focus}</p>
       <div className="grid grid-cols-3 gap-2">{interests.map(([value,label])=><button type="button" key={value} onClick={()=>toggleInterest(value)} className={`rounded-xl border p-3 text-sm transition ${form.interests.includes(value)?'border-stella-gold bg-stella-gold/15 text-stella-gold':'border-white/10 text-white/60'}`}>{label}</button>)}</div>
-      {saveError && <div role="alert" className="rounded-2xl border border-red-400/30 bg-red-950/30 p-3 text-sm text-red-200">{saveError}</div>}
+      {(saveError || profileError) && <div role="alert" className="rounded-2xl border border-red-400/30 bg-red-950/30 p-3 text-sm text-red-200">{saveError || (lang === 'ar' ? `ملف الحساب لم يتزامن مع قاعدة البيانات. [${profileError}]` : `Account profile could not sync. [${profileError}]`)}</div>}
       <button disabled={saving || !form.preferredName.trim() || !form.birthDate} onClick={save} className="w-full rounded-2xl bg-stella-gold p-4 font-bold text-[#171022] disabled:opacity-50">{saving?'...':labels.save}</button>
       <p className="text-[11px] leading-5 text-white/40">{labels.note}</p>
     </div>
