@@ -22,11 +22,10 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.BASIRA_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
-          if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "::error::Private Firebase configuration is required for an installable auth build."
-            exit 1
+          if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           fi
-          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          test -s android/app/google-services.json
           node -e "const c=require('./android/app/google-services.json').client; if(!c.some(x=>x.client_info?.android_client_info?.package_name==='com.basira.spiritportal'))process.exit(1)"
       - name: Install and verify
         run: |
