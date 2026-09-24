@@ -11,12 +11,23 @@ import BasiraReadingText from '../components/BasiraReadingText';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { Capacitor } from '@capacitor/core';
+import { pickNativeReadingImage } from '../utils/readingImagePicker';
 
 export default function PalmistryView({ t, adminPrompt, lang, state, setState, basiraContext }: any) {
     const { isScanning, imagePreview, reading, error } = state;
     const fileRef = useRef<HTMLInputElement>(null);
     const { user, profile, login } = useAuth();
     const [showRewardModal, setShowRewardModal] = useState(false);
+    const pickPhoto = async (source: 'camera' | 'gallery') => {
+        try {
+            const image = await pickNativeReadingImage('palmistry', source);
+            if (image) setState((current: any) => ({ ...current, imagePreview: image, reading: null, error: null, isScanning: false }));
+        } catch (cause) {
+            console.error('Palm photo selection failed', cause);
+            setState((current: any) => ({ ...current, error: lang === 'ar' ? 'تعذّر فتح الصورة. حاول بصورة أخرى.' : 'Could not open this photo.', isScanning: false }));
+        }
+    };
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -128,7 +139,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                 </div>
             </div>
 
-            <div className={`w-full max-w-[340px] h-80 rounded-[40px] relative overflow-hidden flex flex-col items-center justify-center cursor-pointer transition-all duration-700 shadow-md ${imagePreview ? 'border-2 border-stella-gold bg-white' : 'border-[3px] border-dashed border-stella-gold/30 bg-gray-50 hover:bg-stella-gold/5'}`} onClick={() => !isScanning && fileRef.current?.click()}>
+            <div className={`w-full max-w-[340px] h-80 rounded-[40px] relative overflow-hidden flex flex-col items-center justify-center cursor-pointer transition-all duration-700 shadow-md ${imagePreview ? 'border-2 border-stella-gold bg-white' : 'border-[3px] border-dashed border-stella-gold/30 bg-gray-50 hover:bg-stella-gold/5'}`} onClick={() => !isScanning && (Capacitor.isNativePlatform() ? void pickPhoto('gallery') : fileRef.current?.click())}>
                 {imagePreview ? (
                     <>
                         <img src={imagePreview} alt="Palm" className="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-80" />
@@ -142,8 +153,10 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                         <span className="text-[11px] text-gray-500 mt-2 font-tajawal">{lang === 'ar' ? 'اضغط لفتح الكاميرا أو المعرض' : 'Tap to open camera or gallery'}</span>
                     </motion.div>
                 )}
-                <input type="file" ref={fileRef} className="hidden" accept="image/*" capture="environment" onChange={handleUpload} />
+                {!Capacitor.isNativePlatform() && <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleUpload} />}
             </div>
+
+            {Capacitor.isNativePlatform() && <button type="button" onClick={() => void pickPhoto('camera')} className="mt-3 w-full max-w-[340px] rounded-2xl border border-stella-gold/30 py-3 text-stella-gold font-bold">{lang === 'ar' ? 'التقاط صورة للكف' : 'Take a palm photo'}</button>}
 
             {isScanning && <div className="mt-8 text-stella-gold text-sm font-bold animate-pulse tracking-wider drop-shadow-sm">{t.readingLoading}</div>}
             {error && !isScanning && <div role="alert" className="mt-6 w-full max-w-[340px] rounded-2xl border border-red-400/30 bg-red-950/30 p-4 text-center text-sm leading-7 text-red-200">{error}</div>}

@@ -8,6 +8,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { cn } from './utils/cn';
 import { AppStateManager } from './utils/AppStateManager';
 import BasiraOnboarding from './components/BasiraOnboarding';
+import { Capacitor } from '@capacitor/core';
+import { App as NativeApp } from '@capacitor/app';
+import { compressNativeImage, PENDING_IMAGE_KEY, ReadingImageKind } from './utils/readingImagePicker';
 
 type ViewId = 'home' | 'palmistry' | 'face' | 'tarot' | 'divination' | 'coffee' | 'notifications' | 'admin' | 'dashboard' | 'premium' | 'zodiac' | 'other' | 'history' | 'dream' | 'privacy' | 'methodology' | 'moon' | 'dream-journal' | 'rituals';
 
@@ -64,6 +67,34 @@ export default function App() {
     const [tarotState, setTarotState] = useState({ drawnCards: [] as number[], reading: null as string|null, isLoading: false, sessionCards: [] as string[], lastDrawTime: null as number|null });
     const [divState, setDivState] = useState({ name: '', motherName: '', reading: null as string|null, isLoading: false });
     const [coffeeState, setCoffeeState] = useState({ imagePreview: null as string|null, reading: null as string|null, isScanning: false, error: null as string|null });
+
+    useEffect(() => {
+        if (!Capacitor.isNativePlatform()) return;
+        let active = true;
+        let handle: { remove: () => Promise<void> } | undefined;
+        NativeApp.addListener('appRestoredResult', async event => {
+            const kind = localStorage.getItem(PENDING_IMAGE_KEY) as ReadingImageKind | null;
+            if (event.pluginId !== 'BasiraPhotoPicker' || (kind !== 'palmistry' && kind !== 'face')) return;
+            localStorage.removeItem(PENDING_IMAGE_KEY);
+            const media = event.data;
+            if (!event.success || !media?.uri) return;
+            try {
+                const image = await compressNativeImage(Capacitor.convertFileSrc(media.uri));
+                if (!active) return;
+                if (kind === 'palmistry') setPalmState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));
+                else setFaceState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));
+                setActiveView(kind);
+            } catch (error) {
+                console.error('Could not restore selected reading photo', error);
+                if (active) {
+                    const setImageState = kind === 'palmistry' ? setPalmState : setFaceState;
+                    setImageState(current => ({ ...current, isScanning: false, error: 'تعذّر تجهيز الصورة. اختر صورة أخرى.' }));
+                    setActiveView(kind);
+                }
+            }
+        }).then(listener => { if (active) handle = listener; else void listener.remove(); });
+        return () => { active = false; void handle?.remove(); };
+    }, []);
 
     const t = LANGUAGE_PACK[lang];
     useEffect(() => {
