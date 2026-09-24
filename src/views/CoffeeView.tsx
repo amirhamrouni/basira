@@ -4,8 +4,11 @@ import { motion } from 'framer-motion';
 import { Coffee, CheckCircle2, Share2, Save } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
-import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 import { getApiUrl } from '../utils/api';
+import { Capacitor } from '@capacitor/core';
+import { pickNativeReadingImage } from '../utils/readingImagePicker';
+import { remainingFreeReadings, saveMeteredReading } from '../utils/freeReadings';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import BasiraReadingText from '../components/BasiraReadingText';
@@ -16,6 +19,15 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
     const fileRef = useRef<HTMLInputElement>(null);
     const { user, profile, login } = useAuth();
     const [showRewardModal, setShowRewardModal] = React.useState(false);
+    const pickPhoto = async (source: 'camera' | 'gallery') => {
+        try {
+            const image = await pickNativeReadingImage('coffee', source);
+            if (image) setState((current: any) => ({ ...current, imagePreview: image, reading: null, error: null, isScanning: false }));
+        } catch (cause) {
+            console.error('Coffee photo selection failed', cause);
+            setState((current: any) => ({ ...current, error: lang === 'ar' ? 'تعذّر فتح صورة الفنجان. حاول بصورة أخرى.' : 'Could not open this cup photo.', isScanning: false }));
+        }
+    };
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -31,24 +43,10 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
         }
     };
 
-    const saveResult = async (resultText: string) => {
-        if (!user) return;
-        try {
-            await addDoc(collection(db, `users/${user.uid}/readings`), {
-                userId: user.uid,
-                type: 'coffee',
-                result: resultText,
-                createdAt: new Date().toISOString()
-            });
-        } catch(e) {
-            console.error('Failed to save reading', e);
-        }
-    };
-
     const triggerScan = async () => {
         if (!imagePreview) return;
         if (!user || !profile) { login(); return; }
-        if (profile.energy < 15) { setShowRewardModal(true); return; }
+        if (remainingFreeReadings(profile, 'coffee') === 0 && profile.energy < 15) { setShowRewardModal(true); return; }
         setState((current: any) => ({ ...current, isScanning: true, reading: null, error: null }));
 
         try {
@@ -87,10 +85,9 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
 
             const generatedReading = typeof data.reply === 'string' ? data.reply.trim() : '';
             if (!generatedReading) throw new Error('Empty coffee reading');
-            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            await saveMeteredReading(db, user.uid, 'coffee', generatedReading);
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
             rememberReading(user.uid, 'coffee', generatedReading);
-            await saveResult(generatedReading);
         } catch (err) {
             console.error('Coffee reading failed', err);
             const message = lang === 'ar' ? 'تعذّر تحليل الفنجان الآن. لم تُحفظ قراءة؛ تحقق من الاتصال ثم أعد المحاولة.' : 'The cup could not be analyzed. Nothing was saved; please retry.';
@@ -128,7 +125,7 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
             <div className="text-center px-4"><p className="text-gray-600 font-tajawal text-sm mt-3 px-4 max-w-sm mx-auto leading-relaxed">{lang === 'ar' ? 'اشرب القهوة، اقلب الفنجان لثوانٍ، ثم صوّر داخله بوضوح حتى تظهر الرواسب.' : 'Drink your coffee, turn the cup upside down briefly, then take a clear photo of the inside and visible grounds.'}</p></div>
 
             <div className="bg-white rounded-3xl overflow-hidden mt-2 border border-gray-100 shadow-sm mx-4">
-                <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileRef} onChange={handleUpload} />
+                {!Capacitor.isNativePlatform() && <input type="file" accept="image/*" className="hidden" ref={fileRef} onChange={handleUpload} />}
                 {imagePreview ? (
                     <div className="relative w-full aspect-square">
                         <img src={imagePreview} alt="Coffee Cup" className="w-full h-full object-cover" />
@@ -137,11 +134,14 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
                     </div>
                 ) : (
                     <motion.div whileHover={{ scale: 1.05 }} className="text-center p-8 flex flex-col items-center bg-gray-50 border-2 border-dashed border-gray-200 m-4 rounded-2xl">
-                        <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }} className="w-24 h-24 rounded-full bg-white flex items-center justify-center mb-5 border-[3px] border-stella-gold/20 cursor-pointer shadow-sm" onClick={() => fileRef.current?.click()}><Coffee className="text-stella-gold w-10 h-10" /></motion.div>
+                        <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }} className="w-24 h-24 rounded-full bg-white flex items-center justify-center mb-5 border-[3px] border-stella-gold/20 cursor-pointer shadow-sm" onClick={() => Capacitor.isNativePlatform() ? void pickPhoto('gallery') : fileRef.current?.click()}><Coffee className="text-stella-gold w-10 h-10" /></motion.div>
                         <span className="text-stella-gold font-bold text-lg">{t.coffeeUpload}</span>
                     </motion.div>
                 )}
             </div>
+
+            {Capacitor.isNativePlatform() && <div className="mx-4 flex gap-3"><button type="button" onClick={() => void pickPhoto('gallery')} className="flex-1 rounded-2xl border border-stella-gold/30 py-3 text-stella-gold font-bold">{lang === 'ar' ? 'اختيار صورة' : 'Choose photo'}</button><button type="button" onClick={() => void pickPhoto('camera')} className="flex-1 rounded-2xl border border-stella-gold/30 py-3 text-stella-gold font-bold">{lang === 'ar' ? 'تصوير الفنجان' : 'Take photo'}</button></div>}
+            <p className="mx-4 text-center text-xs text-stella-gold">{remainingFreeReadings(profile, 'coffee') > 0 ? (lang === 'ar' ? `باقي ${remainingFreeReadings(profile, 'coffee')} قراءات مجانية من 3` : `${remainingFreeReadings(profile, 'coffee')} of 3 free readings left`) : (lang === 'ar' ? 'القراءة التالية: 15 طاقة' : 'Next reading: 15 Energy')}</p>
 
             {reading && (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-5 border border-gray-100 shadow-sm rounded-3xl mx-4">

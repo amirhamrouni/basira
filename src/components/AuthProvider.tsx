@@ -29,6 +29,7 @@ export interface UserProfile {
     photoURL?: string;
     onboardingCompleted?: boolean;
     basiraContext?: import('../utils/basiraContext').BasiraContext;
+    freeReadings?: { palmistry?: number; coffee?: number };
 }
 
 interface AuthContextType {

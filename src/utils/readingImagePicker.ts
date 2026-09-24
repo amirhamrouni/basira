@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { registerPlugin } from '@capacitor/core';
 import { compressReadingImage } from './imageCompression';
 
-export type ReadingImageKind = 'palmistry' | 'face';
+export type ReadingImageKind = 'palmistry' | 'face' | 'coffee';
 export const PENDING_IMAGE_KEY = 'basira_pending_reading_image';
 const NativePhotoPicker = registerPlugin<{ pickPhoto(options: { source: 'camera' | 'gallery' }): Promise<{ uri?: string }> }>('BasiraPhotoPicker');
 

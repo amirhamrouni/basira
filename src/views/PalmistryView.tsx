@@ -4,13 +4,14 @@ import { motion } from 'framer-motion';
 import { Fingerprint, CheckCircle2, Share2, Save } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db, analytics } from '../firebase';
-import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 import { logEvent } from 'firebase/analytics';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 import BasiraReadingText from '../components/BasiraReadingText';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { remainingFreeReadings, saveMeteredReading } from '../utils/freeReadings';
 import { Capacitor } from '@capacitor/core';
 import { pickNativeReadingImage } from '../utils/readingImagePicker';
 
@@ -43,27 +44,13 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
         }
     };
 
-    const saveResult = async (resultText: string) => {
-        if (!user) return;
-        try {
-            await addDoc(collection(db, `users/${user.uid}/readings`), {
-                userId: user.uid,
-                type: 'palmistry',
-                result: resultText,
-                createdAt: new Date().toISOString()
-            });
-        } catch(e) {
-            console.error('Failed to save reading', e);
-        }
-    };
-
     const triggerScan = async () => {
         if (!imagePreview) return;
         if (!user || !profile) {
             login();
             return;
         }
-        if (profile.energy < 15) {
+        if (remainingFreeReadings(profile, 'palmistry') === 0 && profile.energy < 15) {
             setShowRewardModal(true);
             return;
         }
@@ -104,10 +91,9 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                 return;
             }
 
-            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            await saveMeteredReading(db, user.uid, 'palmistry', generatedReading);
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
             rememberReading(user.uid, 'palm', generatedReading);
-            await saveResult(generatedReading);
             if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'palmistry' });
         } catch (err) {
             console.error('Palmistry reading failed', err);
@@ -161,7 +147,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
             {isScanning && <div className="mt-8 text-stella-gold text-sm font-bold animate-pulse tracking-wider drop-shadow-sm">{t.readingLoading}</div>}
             {error && !isScanning && <div role="alert" className="mt-6 w-full max-w-[340px] rounded-2xl border border-red-400/30 bg-red-950/30 p-4 text-center text-sm leading-7 text-red-200">{error}</div>}
 
-            {imagePreview && !reading && !isScanning && <button onClick={triggerScan} className="w-full max-w-[340px] mt-8 bg-stella-gold text-white font-extrabold py-4 rounded-2xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-lg">{t.scanBtn} <span className="text-xs ml-2 opacity-90">(15 Energy)</span></button>}
+            {imagePreview && !reading && !isScanning && <button onClick={triggerScan} className="w-full max-w-[340px] mt-8 bg-stella-gold text-white font-extrabold py-4 rounded-2xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-lg">{t.scanBtn} <span className="text-xs ml-2 opacity-90">{remainingFreeReadings(profile, 'palmistry') > 0 ? (lang === 'ar' ? `مجانية ${remainingFreeReadings(profile, 'palmistry')}/3` : `Free ${remainingFreeReadings(profile, 'palmistry')}/3`) : '15 Energy'}</span></button>}
 
             {reading && (
                 <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="w-full mt-8 mb-6">

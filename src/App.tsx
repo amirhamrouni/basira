@@ -74,7 +74,7 @@ export default function App() {
         let handle: { remove: () => Promise<void> } | undefined;
         NativeApp.addListener('appRestoredResult', async event => {
             const kind = localStorage.getItem(PENDING_IMAGE_KEY) as ReadingImageKind | null;
-            if (event.pluginId !== 'BasiraPhotoPicker' || (kind !== 'palmistry' && kind !== 'face')) return;
+            if (event.pluginId !== 'BasiraPhotoPicker' || (kind !== 'palmistry' && kind !== 'face' && kind !== 'coffee')) return;
             localStorage.removeItem(PENDING_IMAGE_KEY);
             const media = event.data;
             if (!event.success || !media?.uri) return;
@@ -82,12 +82,13 @@ export default function App() {
                 const image = await compressNativeImage(Capacitor.convertFileSrc(media.uri));
                 if (!active) return;
                 if (kind === 'palmistry') setPalmState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));
-                else setFaceState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));
+                else if (kind === 'face') setFaceState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));
+                else setCoffeeState(current => ({ ...current, imagePreview: image, reading: null, isScanning: false, error: null }));
                 setActiveView(kind);
             } catch (error) {
                 console.error('Could not restore selected reading photo', error);
                 if (active) {
-                    const setImageState = kind === 'palmistry' ? setPalmState : setFaceState;
+                    const setImageState = kind === 'palmistry' ? setPalmState : kind === 'face' ? setFaceState : setCoffeeState;
                     setImageState(current => ({ ...current, isScanning: false, error: 'تعذّر تجهيز الصورة. اختر صورة أخرى.' }));
                     setActiveView(kind);
                 }
