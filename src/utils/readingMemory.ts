@@ -17,7 +17,7 @@ export function rememberReading(uid: string | undefined, type: string, reading: 
     const direction = reading.match(/\[ما\s*(?:الذي\s*)?يقترب\]([^[]*)/i)?.[1]?.trim() || '';
     const previous = recentReadings(uid);
     localStorage.setItem(key(uid), JSON.stringify([...previous, {
-      type: type.slice(0, 24), signals: signals.slice(0, 280), direction: direction.slice(0, 160), at: Date.now()
+      type: type.slice(0, 24), signals: signals.slice(0, 700), direction: direction.slice(0, 160), at: Date.now()
     }].slice(-6)));
   } catch { /* Reading still succeeds if storage is unavailable. */ }
 }

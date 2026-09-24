@@ -175,7 +175,7 @@ function safeReadingMemory(value) {
     if (!Array.isArray(value)) return 'none';
     const entries = value.slice(-3).map(item => ({
         type: cleanText(item?.type, 24),
-        signals: cleanText(item?.signals, 280),
+        signals: cleanText(item?.signals, 700),
         direction: cleanText(item?.direction, 160)
     })).filter(item => item.type && item.signals);
     return entries.length ? JSON.stringify(entries) : 'none';
@@ -391,6 +391,29 @@ async function startServer() {
         }
     }
 
+    function repeatedSignalLines(reply, memory) {
+        if (memory === 'none') return 0;
+        const oldLines = JSON.parse(memory).flatMap(entry => entry.signals.split('\n'));
+        const newLines = String(reply || '').split('\n').filter(line => /^\s*[1-3][.،)]/.test(line));
+        const words = line => line.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim().split(' ');
+        return newLines.filter(line => {
+            const current = words(line);
+            return oldLines.some(old => {
+                const prior = new Set(words(old));
+                return current.length > 8 && current.filter(word => prior.has(word)).length / current.length > 0.8;
+            });
+        }).length;
+    }
+
+    async function generateDistinctReading(contents, config, memory) {
+        let result = await generateContent({ contents, config });
+        if (repeatedSignalLines(result.text, memory) < 2) return result;
+        const revision = `Your draft repeated signal lines from this user's prior reading. Rewrite the ENTIRE reading with different emphasis and specific relations between the same real signals. Ground it in the NEW question. Never copy any sentence from the prior reading. If the evidence is unchanged, say the direction is unchanged in [ما يقترب]; do not invent evidence.\nPRIOR READING: ${memory}\nREPEATED DRAFT: ${String(result.text).slice(0, 1500)}`;
+        const updatedContents = typeof contents === 'string' ? `${contents}\n\n${revision}` : [...contents, { text: revision }];
+        result = await generateContent({ contents: updatedContents, config });
+        return result;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ENDPOINT: /api/daily-horoscope
     // HYBRID AI ENGINE: Real API data → Rewrite
@@ -577,10 +600,10 @@ Additional coffee rules:
         const spreadName = cleanText(req.body?.spreadName, 100);
         const ctx = safeReadingContext(req.body?.basiraContext, lang);
         try {
-            const response = await generateWithRetry(() => generateContent({
-                contents: basiraVoice(lang, ctx, safeReadingMemory(req.body?.recentReadings)) + '\n\nTAROT TASK:\nSpread: ' + spreadName + '\nQuestion: ' + question + '\nCards: ' + JSON.stringify(cards) + '\nName the exact selected card and position for each signal. Explain how the first card changes the meaning of the second, then how the third changes the direction. Do not give independent definitions or claim hidden facts about third parties.',
-                config: { temperature: 0.75, maxOutputTokens: 1050 }
-            }));
+            const memory = safeReadingMemory(req.body?.recentReadings);
+            const response = await generateWithRetry(() => generateDistinctReading(
+                basiraVoice(lang, ctx, memory) + '\n\nTAROT TASK:\nSpread: ' + spreadName + '\nQuestion: ' + question + '\nCards: ' + JSON.stringify(cards) + '\nName the exact selected card and position for each signal. Explain how the first card changes the meaning of the second, then how the third changes the direction. Do not give independent definitions or claim hidden facts about third parties.',
+                { temperature: 0.75, maxOutputTokens: 1050 }, memory));
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
             return res.json({ reply });
