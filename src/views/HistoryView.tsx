@@ -4,6 +4,7 @@ import { Coffee, Fingerprint, Sun, Eye, ChevronDown, ChevronUp, Calendar, Trash2
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
 import { collection, query, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { shareReading } from '../utils/shareResult';
 
 export default function HistoryView({ lang, onNavigate }: any) {
     const { user, login } = useAuth();
@@ -56,18 +57,7 @@ export default function HistoryView({ lang, onNavigate }: any) {
 
     const handleShare = async (readingText: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: lang === 'ar' ? 'حكمتي من تطبيق بصيرة' : 'My Reading from BASIRA',
-                    text: readingText
-                });
-            } catch (err) {
-                console.error("Error sharing", err);
-            }
-        } else {
-            alert(lang === 'ar' ? 'المشاركة غير مدعومة في متصفحك' : 'Sharing is not supported in this browser');
-        }
+        await shareReading(lang === 'ar' ? 'حكمتي من تطبيق بصيرة' : 'My Reading from BASIRA', readingText);
     };
 
     const getTypeDetails = (type: string) => {

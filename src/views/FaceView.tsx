@@ -10,10 +10,24 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { compressReadingImage } from '../utils/imageCompression';
 import BasiraReadingText from '../components/BasiraReadingText';
 import CosmicRewardModal from '../components/CosmicRewardModal';
+import { Capacitor } from '@capacitor/core';
+import { pickNativeReadingImage } from '../utils/readingImagePicker';
 
 export default function FaceView({ t, adminPrompt, lang, state, setState, basiraContext }: any) {
     const { imagePreview, reading, isScanning, error } = state;
     const [showRewardModal, setShowRewardModal] = React.useState(false);
+    const pickPhoto = async (source: 'camera' | 'gallery') => {
+        try {
+            const image = await pickNativeReadingImage('face', source);
+            if (image) {
+                setState((current: any) => ({ ...current, imagePreview: image, reading: null, error: null }));
+                await analyzeFace(image);
+            }
+        } catch (cause) {
+            console.error('Face photo selection failed', cause);
+            setState((current: any) => ({ ...current, isScanning: false, error: lang === 'ar' ? 'تعذّر فتح الصورة. حاول بصورة أخرى.' : 'Could not open this photo.' }));
+        }
+    };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -102,13 +116,13 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
                         <div className="w-28 h-28 rounded-full bg-gray-50 border-2 border-stella-border flex items-center justify-center shadow-sm"><span className="text-5xl">🎭</span></div>
                         <p className="text-sm font-tajawal text-gray-600 px-4 text-center leading-relaxed">{t.faceDesc}</p>
                         <div className="flex gap-4 w-full mt-4">
-                            <label className="flex-1 bg-stella-gold/10 border border-stella-gold/30 py-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-stella-gold/20 transition-colors shadow-sm">
+                            <label onClick={Capacitor.isNativePlatform() ? () => void pickPhoto('camera') : undefined} className="flex-1 bg-stella-gold/10 border border-stella-gold/30 py-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-stella-gold/20 transition-colors shadow-sm">
                                 <Camera className="w-5 h-5 text-stella-gold" /> <span className="font-cairo font-bold text-stella-gold tracking-wide">{t.capture}</span>
-                                <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleImageUpload} />
+                                {!Capacitor.isNativePlatform() && <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleImageUpload} />}
                             </label>
-                            <label className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 py-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                            <label onClick={Capacitor.isNativePlatform() ? () => void pickPhoto('gallery') : undefined} className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 py-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors">
                                 <ImageIcon className="w-5 h-5" /> <span className="font-cairo font-bold tracking-wide">{t.gallery}</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                {!Capacitor.isNativePlatform() && <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />}
                             </label>
                         </div>
                     </div>
@@ -132,7 +146,7 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
                 </motion.div>
             )}
 
-            {imagePreview && error && !isScanning && (
+            {imagePreview && !reading && !isScanning && (
                 <button type="button" onClick={() => analyzeFace(imagePreview)} className="w-full rounded-2xl bg-stella-gold px-5 py-4 font-bold text-white shadow-md transition hover:brightness-110">
                     {lang === 'ar' ? 'إعادة المحاولة بنفس الصورة' : lang === 'fr' ? 'Réessayer avec cette image' : 'Retry with this image'}
                 </button>

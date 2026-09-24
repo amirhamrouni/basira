@@ -29,6 +29,7 @@ export interface UserProfile {
     photoURL?: string;
     onboardingCompleted?: boolean;
     basiraContext?: import('../utils/basiraContext').BasiraContext;
+    freeReadings?: { palmistry?: number; coffee?: number };
 }
 
 interface AuthContextType {
@@ -82,7 +83,14 @@ const ensureUserProfile = async (currentUser: User) => {
             });
             if (analytics) logEvent(analytics, 'sign_up');
         } else {
-            await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
+            // Older profiles may have a negative balance. Production Firestore
+            // rules validate the entire merged document on every update, so
+            // even a lastLogin or onboarding write fails until it is repaired.
+            const storedEnergy = docSnap.data().energy;
+            await setDoc(userRef, {
+                lastLogin: serverTimestamp(),
+                ...(typeof storedEnergy === 'number' && storedEnergy < 0 ? { energy: 0 } : {}),
+            }, { merge: true });
         }
     } catch (error) {
         console.error('Error ensuring user profile:', error);

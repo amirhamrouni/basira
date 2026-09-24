@@ -4,19 +4,32 @@ import { motion } from 'framer-motion';
 import { Fingerprint, CheckCircle2, Share2, Save } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db, analytics } from '../firebase';
-import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 import { logEvent } from 'firebase/analytics';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 import BasiraReadingText from '../components/BasiraReadingText';
+import { shareReading } from '../utils/shareResult';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { remainingFreeReadings, saveMeteredReading } from '../utils/freeReadings';
+import { Capacitor } from '@capacitor/core';
+import { pickNativeReadingImage } from '../utils/readingImagePicker';
 
 export default function PalmistryView({ t, adminPrompt, lang, state, setState, basiraContext }: any) {
     const { isScanning, imagePreview, reading, error } = state;
     const fileRef = useRef<HTMLInputElement>(null);
     const { user, profile, login } = useAuth();
     const [showRewardModal, setShowRewardModal] = useState(false);
+    const pickPhoto = async (source: 'camera' | 'gallery') => {
+        try {
+            const image = await pickNativeReadingImage('palmistry', source);
+            if (image) setState((current: any) => ({ ...current, imagePreview: image, reading: null, error: null, isScanning: false }));
+        } catch (cause) {
+            console.error('Palm photo selection failed', cause);
+            setState((current: any) => ({ ...current, error: lang === 'ar' ? 'تعذّر فتح الصورة. حاول بصورة أخرى.' : 'Could not open this photo.', isScanning: false }));
+        }
+    };
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -32,27 +45,13 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
         }
     };
 
-    const saveResult = async (resultText: string) => {
-        if (!user) return;
-        try {
-            await addDoc(collection(db, `users/${user.uid}/readings`), {
-                userId: user.uid,
-                type: 'palmistry',
-                result: resultText,
-                createdAt: new Date().toISOString()
-            });
-        } catch(e) {
-            console.error('Failed to save reading', e);
-        }
-    };
-
     const triggerScan = async () => {
         if (!imagePreview) return;
         if (!user || !profile) {
             login();
             return;
         }
-        if (profile.energy < 15) {
+        if (remainingFreeReadings(profile, 'palmistry') === 0 && profile.energy < 15) {
             setShowRewardModal(true);
             return;
         }
@@ -62,7 +61,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
         try {
             if (analytics) logEvent(analytics, 'ai_reading_started', { type: 'palmistry' });
 
-            const promptInstruction = `Check carefully whether the uploaded image is a clear human palm. If it is not a palm or the main lines are not sufficiently visible, reply exactly ERROR_NOT_A_PALM. If valid, produce a BASIRA V2 palm reading in ${lang === 'ar' ? 'clear Modern Standard Arabic' : lang === 'fr' ? 'natural French' : 'natural English'}. Identify only lines, branches, intersections, mounts or proportions that are genuinely visible. Start from the three strongest visible signals. Use short bracketed sections: [أقوى 3 إشارات], [ما الذي يقترب], [الحب والعلاقات] when supported, [العمل والمال] when supported, [تنبيه بصيرة], [التوقيت] when appropriate, [سؤال بصيرة]. Separate visible observation from traditional symbolic interpretation without turning the answer into disclaimers. Never fabricate a line or claim certainty.`;
+            const promptInstruction = `First identify whether the image contains a human palm. A clearly visible palm is valid even when some fine lines are faint, cropped or in uneven light. Reject with ERROR_NOT_A_PALM only when no palm is visible or the image is unusable. If valid, produce a BASIRA V2 palm reading in ${lang === 'ar' ? 'clear Modern Standard Arabic' : lang === 'fr' ? 'natural French' : 'natural English'}. Identify only lines, branches, intersections, mounts or proportions that are genuinely visible. Start with up to three strongest actual signals; never invent signals to fill a quota. If details are faint, use only visible cues and state which marks need a clearer photo instead of guessing. Use short bracketed sections: [أقوى 3 إشارات], [ما الذي يقترب], [الحب والعلاقات] when supported, [العمل والمال] when supported, [تنبيه بصيرة], [التوقيت] when appropriate, [سؤال بصيرة]. Separate visible observation from traditional symbolic interpretation without turning the answer into disclaimers. Never claim certainty.`;
 
             const res = await fetchWithTimeout(getApiUrl('/api/palmistry'), {
                 method: 'POST',
@@ -93,10 +92,9 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                 return;
             }
 
-            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            await saveMeteredReading(db, user.uid, 'palmistry', generatedReading);
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
             rememberReading(user.uid, 'palm', generatedReading);
-            await saveResult(generatedReading);
             if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'palmistry' });
         } catch (err) {
             console.error('Palmistry reading failed', err);
@@ -105,17 +103,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
         }
     };
 
-    const handleShare = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({ title: lang === 'ar' ? 'قراءتي من بصيرة' : 'My Basira Palm Reading', text: reading });
-            } catch (err) {
-                console.error('Error sharing', err);
-            }
-        } else {
-            alert(lang === 'ar' ? 'المشاركة غير مدعومة في متصفحك' : 'Sharing is not supported in this browser');
-        }
-    };
+    const handleShare = () => shareReading(lang === 'ar' ? 'قراءتي من بصيرة' : 'My Basira Palm Reading', reading);
 
     return (
         <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col items-center w-full">
@@ -128,7 +116,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                 </div>
             </div>
 
-            <div className={`w-full max-w-[340px] h-80 rounded-[40px] relative overflow-hidden flex flex-col items-center justify-center cursor-pointer transition-all duration-700 shadow-md ${imagePreview ? 'border-2 border-stella-gold bg-white' : 'border-[3px] border-dashed border-stella-gold/30 bg-gray-50 hover:bg-stella-gold/5'}`} onClick={() => !isScanning && fileRef.current?.click()}>
+            <div className={`w-full max-w-[340px] h-80 rounded-[40px] relative overflow-hidden flex flex-col items-center justify-center cursor-pointer transition-all duration-700 shadow-md ${imagePreview ? 'border-2 border-stella-gold bg-white' : 'border-[3px] border-dashed border-stella-gold/30 bg-gray-50 hover:bg-stella-gold/5'}`} onClick={() => !isScanning && (Capacitor.isNativePlatform() ? void pickPhoto('gallery') : fileRef.current?.click())}>
                 {imagePreview ? (
                     <>
                         <img src={imagePreview} alt="Palm" className="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-80" />
@@ -142,13 +130,15 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                         <span className="text-[11px] text-gray-500 mt-2 font-tajawal">{lang === 'ar' ? 'اضغط لفتح الكاميرا أو المعرض' : 'Tap to open camera or gallery'}</span>
                     </motion.div>
                 )}
-                <input type="file" ref={fileRef} className="hidden" accept="image/*" capture="environment" onChange={handleUpload} />
+                {!Capacitor.isNativePlatform() && <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleUpload} />}
             </div>
+
+            {Capacitor.isNativePlatform() && <button type="button" onClick={() => void pickPhoto('camera')} className="mt-3 w-full max-w-[340px] rounded-2xl border border-stella-gold/30 py-3 text-stella-gold font-bold">{lang === 'ar' ? 'التقاط صورة للكف' : 'Take a palm photo'}</button>}
 
             {isScanning && <div className="mt-8 text-stella-gold text-sm font-bold animate-pulse tracking-wider drop-shadow-sm">{t.readingLoading}</div>}
             {error && !isScanning && <div role="alert" className="mt-6 w-full max-w-[340px] rounded-2xl border border-red-400/30 bg-red-950/30 p-4 text-center text-sm leading-7 text-red-200">{error}</div>}
 
-            {imagePreview && !reading && !isScanning && <button onClick={triggerScan} className="w-full max-w-[340px] mt-8 bg-stella-gold text-white font-extrabold py-4 rounded-2xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-lg">{t.scanBtn} <span className="text-xs ml-2 opacity-90">(15 Energy)</span></button>}
+            {imagePreview && !reading && !isScanning && <button onClick={triggerScan} className="w-full max-w-[340px] mt-8 bg-stella-gold text-white font-extrabold py-4 rounded-2xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-lg">{t.scanBtn} <span className="text-xs ml-2 opacity-90">{remainingFreeReadings(profile, 'palmistry') > 0 ? (lang === 'ar' ? `مجانية ${remainingFreeReadings(profile, 'palmistry')}/3` : `Free ${remainingFreeReadings(profile, 'palmistry')}/3`) : '15 Energy'}</span></button>}
 
             {reading && (
                 <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="w-full mt-8 mb-6">

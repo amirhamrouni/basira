@@ -6,6 +6,9 @@ const required = [
   ['android/app/src/main/java/com/basira/spiritportal/MainActivity.java', 'extends BridgeActivity'],
   ['capacitor.config.ts', "providers: ['google.com']"],
   ['capacitor.config.ts', 'skipNativeAuth: false'],
+  ['android/app/src/main/java/com/basira/spiritportal/MainActivity.java', 'registerPlugin(BasiraPhotoPicker.class)'],
+  ['android/app/src/main/AndroidManifest.xml', 'android:grantUriPermissions="true"'],
+  ['android/app/capacitor.build.gradle', "implementation project(':capacitor-share')"],
 ];
 
 let failed = false;
@@ -22,6 +25,12 @@ for (const [file, needle] of required) {
   } else {
     console.log('PASS', file);
   }
+}
+
+const androidManifest = fs.readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+if (androidManifest.includes('<uses-permission android:name="android.permission.CAMERA"')) {
+  console.error('FAIL external camera intent requires removing unrequested CAMERA permission.');
+  failed = true;
 }
 
 if (process.argv.includes('--structure-only')) {

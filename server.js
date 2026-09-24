@@ -525,13 +525,13 @@ Write only the reading. No titles, no labels, no preamble.`;
                     contents: [
                         { inlineData: image },
                         {
-                            text: `First, critically analyze if this image shows the inside of a coffee cup (فنجان قهوة) with coffee grounds. If not a coffee cup, reply EXACTLY with "ERROR_NOT_A_CUP" and nothing else.
+                            text: `First, check whether any visible part of this image shows the inside of a coffee cup (فنجان قهوة) with coffee residue. A real cup with a few visible grounds remains valid even if the pattern is faint, cropped, or photographed in uneven light. Reply EXACTLY "ERROR_NOT_A_CUP" only when no inside of a coffee cup with residue is visible or the image is unusable. Never mistake a valid cup for a wrong image because the marks are subtle.
 
 If it IS a coffee cup: You are BASIRA, an intense traditional coffee-ground reader. ${langInstruction}.\n${basiraVoice(lang, readingContext, safeReadingMemory(req.body?.recentReadings))}
 Additional coffee rules:
-- Identify 2-4 shapes or patterns genuinely visible in the grounds.
+- Identify up to three shapes or patterns genuinely visible in the grounds; do not invent marks to fill a quota.
 - Name where they appear in the cup when visible.
-- Do not invent symbols to make the story dramatic.
+- If only one mark is visible, describe that one and say what would need a clearer photo rather than inventing additional marks.
 - Connect the shape, its position, and another genuinely visible mark into one conditional scenario. Describe observations before interpretation.`
                         }
                     ],
@@ -567,7 +567,7 @@ Additional coffee rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nDescribe precisely where each visible line, branch or crossing appears BEFORE its traditional interpretation. Connect the strongest mark, its location and a second mark into one conditional scenario. If the image is not clearly a palm, reply exactly ERROR_NOT_A_PALM. Never invent unclear lines.' },
+                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify whether a human palm is visible before judging line sharpness. A genuine palm with faint lines is still a palm. Reject with ERROR_NOT_A_PALM only if no palm is visible or the photo is unusable. Describe precisely only those lines, branches, crossings and palm contours you can actually distinguish BEFORE their traditional interpretation. Connect the strongest visible mark, its location and a second mark when visible into one conditional scenario. If too few marks are visible, use only the visible ones and recommend a clearer photo without inventing details.' },
                         { inlineData: image }
                     ],
                     config: { temperature: 0.75, maxOutputTokens: 1050 }
