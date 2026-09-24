@@ -525,23 +525,24 @@ Write only the reading. No titles, no labels, no preamble.`;
                     contents: [
                         { inlineData: image },
                         {
-                            text: `First, check whether any visible part of this image shows the inside of a coffee cup (فنجان قهوة) with coffee residue. A real cup with a few visible grounds remains valid even if the pattern is faint, cropped, or photographed in uneven light. Reply EXACTLY "ERROR_NOT_A_CUP" only when no inside of a coffee cup with residue is visible or the image is unusable. Never mistake a valid cup for a wrong image because the marks are subtle.
+                            text: `First, check whether this image shows the inside of a coffee cup (فنجان قهوة). Reply EXACTLY "ERROR_NOT_A_CUP" only when no inside of a cup is visible. If it is a real cup but no coffee-ground mark can actually be distinguished, reply EXACTLY "ERROR_CUP_GROUNDS_UNREADABLE". A real cup with even one genuinely visible mark is valid despite uneven light.
 
 If it IS a coffee cup: You are BASIRA, an intense traditional coffee-ground reader. ${langInstruction}.\n${basiraVoice(lang, readingContext, safeReadingMemory(req.body?.recentReadings))}
 Additional coffee rules:
 - Identify up to three shapes or patterns genuinely visible in the grounds; do not invent marks to fill a quota.
 - Name where they appear in the cup when visible.
-- If only one mark is visible, describe that one and say what would need a clearer photo rather than inventing additional marks.
+- If only one mark is visible, describe that one and say what would need a clearer photo rather than inventing additional marks. The absence of a mark is not a visible signal and must not be interpreted. Do not forecast love, money or work unless an actual mark supports it.
 - Connect the shape, its position, and another genuinely visible mark into one conditional scenario. Describe observations before interpretation.`
                         }
                     ],
-                    config: { temperature: 0.75, maxOutputTokens: 1050 }
+                    config: { temperature: 0.45, maxOutputTokens: 1050 }
                 })
             );
 
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
             if (reply === 'ERROR_NOT_A_CUP' || reply.startsWith('ERROR_NOT_A_CUP')) return res.status(422).json({ error: 'NOT_A_CUP' });
+            if (reply.startsWith('ERROR_CUP_GROUNDS_UNREADABLE')) return res.status(422).json({ error: 'NOT_A_CUP', reply: lang === 'ar' ? 'الفنجان ظاهر، لكن علامات البنّ ما تتقراش في الصورة. صوّر داخل الفنجان بإضاءة أوضح.' : 'The cup is visible, but the grounds are not readable. Photograph the inside in clearer light.' });
             return res.json({ reply });
         } catch (e) {
             console.error('[Coffee API] Error:', e.message);
@@ -567,16 +568,17 @@ Additional coffee rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify whether a human palm is visible before judging line sharpness. A genuine palm with faint lines is still a palm. Reject with ERROR_NOT_A_PALM only if no palm is visible or the photo is unusable. Describe precisely only those lines, branches, crossings and palm contours you can actually distinguish BEFORE their traditional interpretation. Connect the strongest visible mark, its location and a second mark when visible into one conditional scenario. If too few marks are visible, use only the visible ones and recommend a clearer photo without inventing details.' },
+                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify whether a human palm is visible before judging line sharpness. Reject with ERROR_NOT_A_PALM only if no human palm is visible. If a real palm is visible but no line, intersection or distinct contour can genuinely be distinguished, reply EXACTLY ERROR_PALM_LINES_UNREADABLE. Never call missing or unclear lines a signal. Describe only marks actually visible BEFORE their traditional interpretation. Connect the strongest visible mark, its location and a second mark when visible into one conditional scenario. If fewer than three marks are visible, provide only the real marks; never use absence as a sign or forecast love, work or money from it.' },
                         { inlineData: image }
                     ],
-                    config: { temperature: 0.75, maxOutputTokens: 1050 }
+                    config: { temperature: 0.45, maxOutputTokens: 1050 }
                 })
             );
 
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
             if (reply === 'ERROR_NOT_A_PALM' || reply.startsWith('ERROR_NOT_A_PALM')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE' });
+            if (reply.startsWith('ERROR_PALM_LINES_UNREADABLE')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE', reply: lang === 'ar' ? 'راحة اليد ظاهرة، لكن الخطوط ما تتقراش في الصورة. صوّرها بإضاءة أمامية أوضح.' : 'Your palm is visible, but its lines are not readable. Take another photo in brighter front light.' });
             return res.json({ reply });
         } catch (e) {
             console.error('[Palmistry API] Error:', e.message);
