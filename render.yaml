@@ -3,7 +3,7 @@ services:
     name: basira
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run check
+    buildCommand: npm install --no-audit --no-fund && npm run check
     startCommand: node server.js
     envVars:
       - key: NODE_ENV

@@ -27,6 +27,8 @@ export interface UserProfile {
     displayName?: string;
     email?: string;
     photoURL?: string;
+    onboardingCompleted?: boolean;
+    basiraContext?: import('../utils/basiraContext').BasiraContext;
 }
 
 interface AuthContextType {
@@ -73,7 +75,8 @@ const ensureUserProfile = async (currentUser: User) => {
                 xp: 0,
                 streak: 1,
                 vipStatus: 'none',
-                role: 'user'
+                role: 'user',
+                onboardingCompleted: false
             });
             if (analytics) logEvent(analytics, 'sign_up');
         } else {
@@ -151,7 +154,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .catch(() => setServerAdmin(false));
     }, []);
 
-    // Auth state listener
     useEffect(() => {
         let unsubscribeProfile: () => void = () => {};
 
@@ -168,7 +170,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     console.error('Profile setup failed:', error);
                 }
 
-                // Real-time profile listener
                 const userRef = doc(db, 'users', currentUser.uid);
                 unsubscribeProfile = onSnapshot(
                     userRef,
@@ -200,14 +201,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const lang = AppStateManager.get('lang') || 'ar';
         try {
             if (Capacitor.isNativePlatform()) {
-                // Native Google flow: no browser redirect and no sessionStorage dependency.
                 const result = await FirebaseAuthentication.signInWithGoogle();
                 const idToken = result.credential?.idToken;
                 if (!idToken) throw Object.assign(new Error('Native Google Sign-In returned no ID token.'), { code: 'auth/native-google-configuration' });
                 const credential = GoogleAuthProvider.credential(idToken);
                 await signInWithCredential(auth, credential);
             } else {
-                // Popup is reliable in standard browsers and keeps the OAuth state in one session.
                 await signInWithPopup(auth, provider);
             }
             if (analytics) logEvent(analytics, 'login', { method: 'google' });
