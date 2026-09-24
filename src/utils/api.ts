@@ -4,7 +4,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Production backend URL for mobile (Capacitor) builds
-const PRODUCTION_API_URL = 'https://basira-preview.amiris001.chatgpt.site';
+const PRODUCTION_API_URL = 'https://basira-1-2fwh.onrender.com';
 
 export function getApiUrl(endpoint: string): string {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
