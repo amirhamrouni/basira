@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanText, parseImageDataUrl, safeLanguage } from './server.js';
+import { cleanText, parseImageDataUrl, safeLanguage, symbolicNamePattern } from './server.js';
 
 describe('API input validation', () => {
     it('accepts only supported languages', () => {
@@ -20,5 +20,13 @@ describe('API input validation', () => {
         });
         expect(parseImageDataUrl('data:text/html;base64,aGVsbG8=')).toBeNull();
         expect(parseImageDataUrl('not-an-image')).toBeNull();
+    });
+
+    it('uses a stable Arabic abjad reduction for the same names', () => {
+        const result = symbolicNamePattern('أحمد', 'أم');
+        expect(result.nameSum).toBe(53);
+        expect(result.motherSum).toBe(41);
+        expect(result.combinedRoot).toBe(4);
+        expect(symbolicNamePattern('احمد', 'ام')).toEqual(result);
     });
 });

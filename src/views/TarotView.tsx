@@ -1,3 +1,4 @@
+import { recentReadings, rememberReading } from '../utils/readingMemory';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, CalendarCheck, Flame, RotateCcw, Send, Sparkles } from 'lucide-react';
@@ -68,12 +69,13 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
             const response = await fetchWithTimeout(getApiUrl('/api/tarot'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cards: selected, question, lang, spreadName: activeSpread.name, positions: activeSpread.positions, readingId: crypto.randomUUID(), basiraContext })
+                body: JSON.stringify({ cards: selected, question, lang, spreadName: activeSpread.name, positions: activeSpread.positions, readingId: crypto.randomUUID(), basiraContext, recentReadings: recentReadings(user.uid) })
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
             const generated = data.reply || buildLocalReading(cards, question, isAr);
             await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            rememberReading(user.uid, 'tarot', generated);
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: generated });
         } catch {
             setError(isAr ? 'تعذّر الاتصال ببصيرة. هذه قراءة محلية مؤقتة ولم تُحفظ كقراءة AI.' : 'Basira could not be reached. Showing a temporary local reading.');
@@ -107,6 +109,9 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
                 body: JSON.stringify({
                     lang,
                     basiraContext,
+                    previousReading: reading,
+                    followUp: followUp.trim(),
+                    recentReadings: recentReadings(user?.uid),
                     context: `PROFILE CONTEXT: ${basiraContext ? JSON.stringify(basiraContext) : 'none'}\nCARDS: ${JSON.stringify(selected)}`,
                     prompt: `Previous reading:\n${reading}\n\nUser follow-up:\n${followUp.trim()}\n\nGo one layer deeper without repeating the first reading. Tie the answer back to the actual selected cards and positions, add one new concrete interpretation and one caution, then end with one sharper question. Keep it concise.`
                 })

@@ -1,3 +1,4 @@
+import { recentReadings, rememberReading } from '../utils/readingMemory';
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Eye, Scroll, Send } from 'lucide-react';
@@ -52,6 +53,7 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                     motherName,
                     lang,
                     basiraContext,
+                    recentReadings: recentReadings(user.uid),
                     context: `${adminPrompt}\nPROFILE CONTEXT: ${contextJson}`,
                     prompt: `Validate that both values look like plausible human names. If either is clearly gibberish, reply exactly ERROR_INVALID_NAME. Otherwise create a BASIRA V2 symbolic name/numerology reading. Use حساب الجمل / traditional name symbolism only as symbolic entertainment, not as scientific fact. Start with the strongest pattern from the two names, then use short sections: [أقوى 3 إشارات], [ما الذي يقترب], [الحب والعلاقات] when relevant, [العمل والمال] when relevant, [تنبيه بصيرة], [التوقيت] when appropriate, [سؤال بصيرة]. Tie claims to the actual names or supplied profile context. Do not invent hidden facts, do not claim certainty, and do not repeat disclaimers inside the reading. Write in ${lang === 'ar' ? 'clear Modern Standard Arabic' : lang === 'fr' ? 'natural French' : 'natural English'}.`
                 })
@@ -65,6 +67,7 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
             } else {
                 if (!data.reply || typeof data.reply !== 'string') throw new Error('Empty divination reading');
                 await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+                rememberReading(user.uid, 'divination', data.reply.trim());
                 setState({ ...state, reading: data.reply.trim(), isLoading: false });
                 if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'divination' });
             }
@@ -84,6 +87,9 @@ export default function DivinationView({ t, adminPrompt, lang, state, setState }
                 body: JSON.stringify({
                     lang,
                     basiraContext: profile?.basiraContext || null,
+                    previousReading: reading,
+                    followUp: followUp.trim(),
+                    recentReadings: recentReadings(user?.uid),
                     prompt: `Previous BASIRA reading:\n${reading}\n\nUser follow-up answer/question:\n${followUp.trim()}\n\nGive a deeper second-layer reading. Do not repeat the first reading. Resolve the user's answer against the strongest earlier signals, add one new concrete symbolic interpretation, one caution, and end with one sharper question. Keep it concise and readable.`,
                     context: `PROFILE CONTEXT: ${profile?.basiraContext ? JSON.stringify(profile.basiraContext) : 'none'}`
                 })

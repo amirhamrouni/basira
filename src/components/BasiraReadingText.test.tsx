@@ -19,4 +19,11 @@ describe('parseBasiraReading', () => {
   it('keeps plain text as one section', () => {
     expect(parseBasiraReading('قراءة قصيرة')).toEqual([{ body: ['قراءة قصيرة'] }]);
   });
+
+  it('keeps an inline heading and its first signal together', () => {
+    expect(parseBasiraReading('[أقوى 3 إشارات] ١. خط ظاهر\n[التوقيت]: خلال أسابيع')).toEqual([
+      { title: 'أقوى 3 إشارات', body: ['١. خط ظاهر'] },
+      { title: 'التوقيت', body: ['خلال أسابيع'] }
+    ]);
+  });
 });

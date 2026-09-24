@@ -171,7 +171,26 @@ function safeReadingContext(value, lang = 'ar') {
     return Object.keys(clean).length ? JSON.stringify(clean) : '';
 }
 
-function basiraVoice(lang, context = '') {
+function safeReadingMemory(value) {
+    if (!Array.isArray(value)) return 'none';
+    const entries = value.slice(-3).map(item => ({
+        type: cleanText(item?.type, 24),
+        signals: cleanText(item?.signals, 280),
+        direction: cleanText(item?.direction, 160)
+    })).filter(item => item.type && item.signals);
+    return entries.length ? JSON.stringify(entries) : 'none';
+}
+
+export function symbolicNamePattern(name, motherName) {
+    const values = { ا: 1, ب: 2, ج: 3, د: 4, ه: 5, و: 6, ز: 7, ح: 8, ط: 9, ي: 10, ك: 20, ل: 30, م: 40, ن: 50, س: 60, ع: 70, ف: 80, ص: 90, ق: 100, ر: 200, ش: 300, ت: 400, ث: 500, خ: 600, ذ: 700, ض: 800, ظ: 900, غ: 1000 };
+    const sum = text => [...text.normalize('NFKC').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[ًٌٍَُِّْـ]/g, '').toLowerCase()]
+        .reduce((total, letter) => total + (values[letter] || (/\p{L}/u.test(letter) ? (letter.codePointAt(0) % 9) + 1 : 0)), 0);
+    const first = sum(name), second = sum(motherName);
+    const root = number => number ? ((number - 1) % 9) + 1 : 0;
+    return { method: 'fixed abjad values for Arabic; Unicode code point modulo 9 for other letters; ignore spaces and punctuation; reduce to 1–9', nameSum: first, motherSum: second, combinedRoot: root(first + second), differenceRoot: root(Math.abs(first - second)) };
+}
+
+function basiraVoice(lang, context = '', memory = 'none') {
     const language = lang === 'ar'
         ? 'Write in clear, vivid Modern Standard Arabic understood across the Arab world. Use short paragraphs and natural headings.'
         : lang === 'fr' ? 'Write in vivid natural French with short paragraphs and headings.'
@@ -179,23 +198,22 @@ function basiraVoice(lang, context = '') {
     return `BASIRA V2 VOICE:
 ${language}
 This is an immersive symbolic reading, not a lecture. Never open or close with disclaimers.
-Start immediately with one striking sentence about the strongest ACTUAL signal in the supplied cards/image.
-Then structure the answer with these compact sections, translated to the response language:
-[أقوى 3 إشارات] exactly three grounded signals.
-[ما الذي يقترب] one concrete symbolic direction or change.
-[الحب والعلاقات] only when relevant to the signals or user focus.
-[العمل والمال] only when relevant to the signals or user focus.
-[تنبيه بصيرة] one practical caution grounded in the reading.
-[التوقيت] a symbolic time window only when the method/input reasonably supports it.
-[سؤال بصيرة] exactly one sharp follow-up question that can deepen the next reading.
-Each strong statement must be traceable to a visible feature, selected card/position, or supplied user context. Never fabricate an observed feature.
+Write the headings EXACTLY in brackets, each on its own line. No introduction before the first heading. Short sentences, no dense paragraphs:
+[أقوى 3 إشارات] exactly THREE numbered lines. Each line: what is ACTUALLY visible (or the card and its position / deterministic name value) → traditional symbolic meaning → how it connects to a second actual signal. Put the strongest first. Never invent a visual mark. If fewer than three independent signals are discernible, say so and do not invent a third.
+[ما يقترب] the strongest CONDITIONAL scenario and a distinct second scenario if the user's choice changes or delays. Say what observable choice changes the path. Two or three specific details must be supported by the actual inputs, not generic surprises.
+[التوقيت] one symbolic window (days, weeks or 1–3 months) only as an interpretive device; identify the signal that motivates the window. No certain dates or guarantees.
+[تنبيه / فرصة] one practical caution or opportunity tied to the signals, with no fear tactics.
+[سؤال متابعة] exactly one pointed question whose answer would choose between the two scenarios.
+Include love, work, money or travel only if an actual signal or the user's explicit question supports that topic. Connect two signals into ONE scenario, not a list of unrelated symbol definitions.
+Every assertion must distinguish observed input from symbolic interpretation. Do not pretend profile details were discovered in the image/cards. Use the profile only to frame the user's situation naturally.
 Prefer phrases such as "العلامة تشير", "الاتجاه الأقوى", "أرى في هذا الرمز" rather than weak generic coaching.
 Do not repeat phrases like "this is not prophecy", "not a prediction", "symbolic mirror", or similar inside the reading. The product UI handles framing.
 Never assert hidden facts about another person. Never create fear through claims of death, illness, pregnancy, crime, curses, certain betrayal, or guaranteed financial outcomes.
 Never direct medical, legal, or financial decisions from divination.
 PROFILE CONTEXT is personalization only. Never present profile/device/location facts as if discovered from cards, palm, cup, or face.
 For face images, visible non-sensitive features may inspire an artistic symbolic narrative only. Never infer factual personality, destiny, health, intelligence, morality, ethnicity, religion, sexuality, criminality, or other sensitive traits.
-Keep the whole reading highly readable: 220-380 words, short paragraphs, no wall of text.
+Keep the whole reading 140–220 words, with no paragraph longer than two short sentences.
+RECENT READINGS (user's own saved history; do not claim divination revealed it): ${memory}. Do not reuse their openings, scenarios or stock wording. If a previous direction is relevant, state what NEW evidence changes it.
 PROFILE CONTEXT: ${context || 'none'}`;
 }
 
@@ -483,15 +501,15 @@ Write only the reading. No titles, no labels, no preamble.`;
                         {
                             text: `First, critically analyze if this image shows the inside of a coffee cup (فنجان قهوة) with coffee grounds. If not a coffee cup, reply EXACTLY with "ERROR_NOT_A_CUP" and nothing else.
 
-If it IS a coffee cup: You are BASIRA, an intense traditional coffee-ground reader. ${langInstruction}.\n${basiraVoice(lang, readingContext)}
+If it IS a coffee cup: You are BASIRA, an intense traditional coffee-ground reader. ${langInstruction}.\n${basiraVoice(lang, readingContext, safeReadingMemory(req.body?.recentReadings))}
 Additional coffee rules:
 - Identify 2-4 shapes or patterns genuinely visible in the grounds.
 - Name where they appear in the cup when visible.
 - Do not invent symbols to make the story dramatic.
-- Build the reading from those observed symbols using BASIRA V2 structure.`
+- Connect the shape, its position, and another genuinely visible mark into one conditional scenario. Describe observations before interpretation.`
                         }
                     ],
-                    config: { temperature: 0.9, maxOutputTokens: 600 }
+                    config: { temperature: 0.75, maxOutputTokens: 1050 }
                 })
             );
 
@@ -523,10 +541,10 @@ Additional coffee rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify 3-5 palm features genuinely visible in the image (major lines, breaks, forks, mounts or proportions only when actually clear). Build BASIRA V2 from those features. Do not fabricate lines you cannot see. Do not dump a long textbook explanation.' },
+                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nDescribe precisely where each visible line, branch or crossing appears BEFORE its traditional interpretation. Connect the strongest mark, its location and a second mark into one conditional scenario. If the image is not clearly a palm, reply exactly ERROR_NOT_A_PALM. Never invent unclear lines.' },
                         { inlineData: image }
                     ],
-                    config: { temperature: 0.88, maxOutputTokens: 700 }
+                    config: { temperature: 0.75, maxOutputTokens: 1050 }
                 })
             );
 
@@ -557,8 +575,8 @@ Additional coffee rules:
         const ctx = safeReadingContext(req.body?.basiraContext, lang);
         try {
             const response = await generateWithRetry(() => generateContent({
-                contents: basiraVoice(lang, ctx) + '\n\nTAROT TASK:\nSpread: ' + spreadName + '\nQuestion: ' + question + '\nCards: ' + JSON.stringify(cards) + '\nUse the exact selected cards and positions. For each of the three strongest signals, explicitly name the card and position before interpreting it. Build BASIRA V2 with a decisive narrative direction. Never turn the answer into a disclaimer essay and never claim certainty or hidden facts about third parties.',
-                config: { temperature: 0.92, maxOutputTokens: 900 }
+                contents: basiraVoice(lang, ctx, safeReadingMemory(req.body?.recentReadings)) + '\n\nTAROT TASK:\nSpread: ' + spreadName + '\nQuestion: ' + question + '\nCards: ' + JSON.stringify(cards) + '\nName the exact selected card and position for each signal. Explain how the first card changes the meaning of the second, then how the third changes the direction. Do not give independent definitions or claim hidden facts about third parties.',
+                config: { temperature: 0.75, maxOutputTokens: 1050 }
             }));
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
@@ -587,15 +605,14 @@ Additional coffee rules:
         }
 
         const ctx = safeReadingContext(req.body?.basiraContext, lang);
-        const clientPrompt = cleanText(req.body?.prompt, 2500);
         try {
             const response = await generateWithRetry(() => generateContent({
-                contents: basiraVoice(lang, ctx) + `\n\nNAME SYMBOLISM TASK:
+                contents: basiraVoice(lang, ctx, safeReadingMemory(req.body?.recentReadings)) + `\n\nNAME SYMBOLISM TASK:
 Name: ${name}
 Mother name: ${motherName}
-${clientPrompt}
-Use traditional letter/name symbolism only as symbolic entertainment. Ground every pattern in the supplied names or profile context. Never invent hidden facts about the user or third parties.`,
-                config: { temperature: 0.88, maxOutputTokens: 800 }
+Fixed symbolic calculation: ${JSON.stringify(symbolicNamePattern(name, motherName))}
+Use only the supplied deterministic sums and reductions for number claims. Never recalculate or invent a value. Ground the symbolic relationship in the names or user profile; do not invent hidden facts.`,
+                config: { temperature: 0.75, maxOutputTokens: 1050 }
             }));
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
@@ -616,15 +633,16 @@ Use traditional letter/name symbolism only as symbolic entertainment. Ground eve
 
         try {
             const lang = safeLanguage(req.body?.lang);
-            const prompt = cleanText(req.body?.prompt, 3000);
+            const prompt = cleanText(req.body?.followUp || req.body?.prompt, 1200);
             const context = cleanText(req.body?.context, 2000);
+            const previous = cleanText(req.body?.previousReading, 2400);
             const readingContext = safeReadingContext(req.body?.basiraContext, lang);
             if (!prompt) return res.status(400).json({ error: 'Missing prompt', reply: getFallback(lang) });
 
             const response = await generateWithRetry(() =>
                 generateContent({
-                    contents: `${basiraVoice(lang, readingContext)}\n\nFOLLOW-UP CONTEXT:\n${context || ''}\n\nUser: ${prompt}`,
-                    config: { temperature: 0.85, maxOutputTokens: 800 }
+                    contents: `${basiraVoice(lang, readingContext, safeReadingMemory(req.body?.recentReadings))}\n\nSECOND READING: The user's answer MUST change the interpretation. State which earlier scenario is now stronger and what in the answer weakens the other. Ground a NEW narrower scenario in both their exact answer and an earlier signal. Add one narrower symbolic time window and one caution. Never repeat the first reading. 100–150 words, ONLY [ما تغيّر], [السيناريو الأقوى], [التوقيت والتنبيه], [سؤال متابعة].\nORIGINAL SIGNALS: ${context || 'none'}\nFIRST READING: ${previous || 'none'}\nUSER ANSWER: ${prompt}`,
+                    config: { temperature: 0.7, maxOutputTokens: 800 }
                 })
             );
 
@@ -663,14 +681,14 @@ Use traditional letter/name symbolism only as symbolic entertainment. Ground eve
                         { inlineData: image },
                         {
                             text: `${prompt || ''}
-You are BASIRA creating a symbolic face-and-aura entertainment reading. ${langInstruction}.\n${basiraVoice(lang, readingContext)}\nUse only non-sensitive visible cues as symbolic inspiration. Do not claim physiognomy can reveal factual personality, destiny, health, intelligence, morality or protected traits.
+You are BASIRA creating a symbolic face-and-aura entertainment reading. ${langInstruction}.\n${basiraVoice(lang, readingContext, safeReadingMemory(req.body?.recentReadings))}\nUse only non-sensitive visible cues as symbolic inspiration. Do not claim physiognomy can reveal factual personality, destiny, health, intelligence, morality or protected traits.
 Use only visible, non-sensitive visual cues such as expression, pose, lighting and composition as artistic symbols.
 Do not use eye shape, jaw shape, forehead shape, facial proportions or other physical morphology to infer personality or destiny.
 Build BASIRA V2 as an artistic aura-style narrative, clearly grounded in those non-sensitive visual cues.
 FORBIDDEN inside the reading: "AI", clinical claims, protected/sensitive trait inference, physiognomy claims.`
                         }
                     ],
-                    config: { temperature: 0.9, maxOutputTokens: 600 }
+                    config: { temperature: 0.75, maxOutputTokens: 1050 }
                 })
             );
 

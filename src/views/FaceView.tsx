@@ -1,3 +1,4 @@
+import { recentReadings, rememberReading } from '../utils/readingMemory';
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Image as ImageIcon, Sparkles, Loader } from 'lucide-react';
@@ -58,7 +59,8 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
                     prompt: adminPrompt,
                     lang,
                     readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-                    basiraContext
+                    basiraContext,
+                    recentReadings: recentReadings(user.uid)
                 })
             });
             const data = await response.json().catch(() => ({}));
@@ -73,6 +75,7 @@ export default function FaceView({ t, adminPrompt, lang, state, setState, basira
             const result = data.reply as string;
             await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
             setState((current: any) => ({ ...current, isScanning: false, reading: result, error: null }));
+            rememberReading(user.uid, 'face', result);
             await saveResult(result);
         } catch (cause) {
             console.error('Face reading failed', cause);

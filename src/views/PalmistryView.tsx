@@ -1,3 +1,4 @@
+import { recentReadings, rememberReading } from '../utils/readingMemory';
 import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Fingerprint, CheckCircle2, Share2, Save } from 'lucide-react';
@@ -72,7 +73,8 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                     imageBuffer: imagePreview,
                     lang,
                     readingId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-                    basiraContext
+                    basiraContext,
+                    recentReadings: recentReadings(user.uid)
                 })
             });
             const data = await res.json().catch(() => ({}));
@@ -93,6 +95,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
 
             await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
+            rememberReading(user.uid, 'palm', generatedReading);
             await saveResult(generatedReading);
             if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'palmistry' });
         } catch (err) {
