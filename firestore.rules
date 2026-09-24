@@ -23,19 +23,12 @@ service cloud.firestore {
         && request.resource.data.vipStatus == 'none';
 
       // Users cannot promote themselves or grant themselves a subscription.
-      allow update: if isAdmin() || (isOwner(userId) && (
-        // Existing profiles can save onboarding and refresh login even when
-        // they predate the role, subscription and energy fields.
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'lastLogin', 'basiraContext', 'onboardingCompleted', 'contextUpdatedAt'
-        ]) || (
-          request.resource.data.role == resource.data.role
-          && request.resource.data.vipStatus == resource.data.vipStatus
-          && request.resource.data.energy is int
-          && request.resource.data.energy >= 0
-          && request.resource.data.energy <= 500
-        )
-      ));
+      allow update: if isAdmin() || (isOwner(userId)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.vipStatus == resource.data.vipStatus
+        && request.resource.data.energy is int
+        && request.resource.data.energy >= 0
+        && request.resource.data.energy <= 500);
 
       allow delete: if isOwner(userId) || isAdmin();
 
