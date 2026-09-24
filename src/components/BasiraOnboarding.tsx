@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
-import { BasiraContext, DEFAULT_BASIRA_CONTEXT } from '../utils/basiraContext';
+import { BasiraContext, DEFAULT_BASIRA_CONTEXT, toFirestoreBasiraContext } from '../utils/basiraContext';
 
 export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
   const { user, profile } = useAuth();
@@ -38,13 +38,7 @@ export default function BasiraOnboarding({ lang }: { lang: 'ar'|'en'|'fr' }) {
     setSaving(true);
     setSaveError('');
     try {
-      const cleanForm = {
-        ...form,
-        preferredName: form.preferredName.trim().slice(0, 50),
-        originCountry: form.originCountry?.trim().toUpperCase() || undefined,
-        residenceCountry: form.residenceCountry?.trim().toUpperCase() || undefined,
-        language: lang
-      };
+      const cleanForm = toFirestoreBasiraContext(form, lang);
       await setDoc(doc(db,'users',user.uid), { basiraContext: cleanForm, onboardingCompleted:true, contextUpdatedAt:serverTimestamp() }, { merge:true });
     } catch (error) {
       console.error('Onboarding save failed', error);
