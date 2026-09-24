@@ -383,7 +383,9 @@ async function startServer() {
             return await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: contents,
-                config: config
+                // Gemini counts internal thinking against maxOutputTokens. With the
+                // default thinking budget, a reading can stop after a single line.
+                config: { ...config, maxOutputTokens: Math.max(config?.maxOutputTokens ?? 800, 1800), thinkingConfig: { thinkingBudget: 0 } }
             });
         }
     }
