@@ -54,4 +54,14 @@ const memory = [{ type: 'tarot', signals: first.slice(0, 270), direction: first.
 const third = (await request('/api/tarot', { lang: 'ar', spreadName: 'ثلاث بطاقات', question: 'بعد التدريب، أين أركز جهدي الآن؟', cards, recentReadings: memory })).reply;
 verify(third, 'MEMORY READING');
 if (third === first) throw new Error('Reading repeated verbatim despite memory');
+const signalLines = text => text.split('\n').filter(line => /^\s*[1-3][.،)]/.test(line));
+const normalize = line => line.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+const previousLines = signalLines(first).map(normalize);
+const repeated = signalLines(third).map(normalize).filter((line, index) => {
+    const old = previousLines[index] || '';
+    const firstWords = new Set(old.split(' '));
+    const words = line.split(' ');
+    return words.length && words.filter(word => firstWords.has(word)).length / words.length > 0.8;
+});
+if (repeated.length > 1) throw new Error(`Memory repeated ${repeated.length} out of 3 signal lines`);
 console.log('PRODUCTION SMOKE PASS');
