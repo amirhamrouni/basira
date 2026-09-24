@@ -13,6 +13,7 @@ async function request(path, body) {
 }
 
 function verify(reply, kind) {
+    console.log(`${kind} RAW (${reply?.length || 0} chars):\n${reply}`);
     if (typeof reply !== 'string' || reply.length < 250) throw new Error(`${kind}: empty/short reading`);
     for (const heading of ['أقوى 3 إشارات', 'ما يقترب', 'التوقيت', 'تنبيه / فرصة', 'سؤال متابعة']) {
         if (!reply.includes(heading)) throw new Error(`${kind}: missing ${heading}`);
