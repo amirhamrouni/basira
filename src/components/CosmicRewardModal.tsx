@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { AdMob } from '@capacitor-community/admob';
+import { AdMob, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Play, X, Lock, Eye, Star, Compass } from 'lucide-react';
 
@@ -48,8 +48,33 @@ export default function CosmicRewardModal({
             await AdMob.initialize();
             const adId = 'ca-app-pub-1233451496176046/5417205489';
             await AdMob.prepareRewardVideoAd({ adId });
-            // The native promise resolves only when Google reports the reward earned.
-            await AdMob.showRewardVideoAd({ adId });
+            let settled = false;
+            let timeoutId: ReturnType<typeof setTimeout> | undefined;
+            let handles: Array<{ remove: () => Promise<void> }> = [];
+            const eventResult = new Promise<void>(async (resolve, reject) => {
+                const finish = (callback: () => void) => {
+                    if (settled) return;
+                    settled = true;
+                    callback();
+                };
+                handles = await Promise.all([
+                    AdMob.addListener(RewardAdPluginEvents.Rewarded, () => finish(resolve)),
+                    AdMob.addListener(RewardAdPluginEvents.Dismissed, () => finish(() => reject(new Error('Rewarded ad dismissed before reward.')))),
+                    AdMob.addListener(RewardAdPluginEvents.FailedToShow, (nativeError) => finish(() => reject(new Error(nativeError?.message || 'Rewarded ad failed to show.')))),
+                ]);
+                timeoutId = setTimeout(() => finish(() => reject(new Error('Rewarded ad timed out.'))), 90000);
+            });
+            try {
+                await Promise.race([
+                    AdMob.showRewardVideoAd({ adId }),
+                    eventResult,
+                ]);
+                await eventResult;
+            } finally {
+                settled = true;
+                if (timeoutId) clearTimeout(timeoutId);
+                await Promise.all(handles.map((handle) => handle.remove()));
+            }
             setState('rewarded');
         } catch (cause) {
             console.error('Rewarded ad failed', cause);
