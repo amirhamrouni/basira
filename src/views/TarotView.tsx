@@ -9,6 +9,7 @@ import BasiraReadingText from '../components/BasiraReadingText';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
 import { doc, updateDoc, increment } from 'firebase/firestore';
+import { saveMeteredReading } from '../utils/freeReadings';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 
 export default function TarotView({ lang, state, setState, basiraContext }: any) {
@@ -74,7 +75,7 @@ export default function TarotView({ lang, state, setState, basiraContext }: any)
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
             const generated = data.reply || buildLocalReading(cards, question, isAr);
-            await updateDoc(doc(db, 'users', user.uid), { energy: increment(-15) });
+            await saveMeteredReading(db, user.uid, 'tarot', generated);
             rememberReading(user.uid, 'tarot', generated);
             setState({ ...state, drawnCards: allDrawn, isLoading: false, reading: generated });
         } catch {
