@@ -21,12 +21,12 @@ function makeResponse() {
 }
 
 describe('Google Play billing verification route', () => {
-  it('requires a Firebase bearer token', async () => {
+  it('requires a Firebase bearer token before purchase validation', async () => {
     const handler = createPlayBillingVerifyHandler({ env: {} });
     const res = makeResponse();
     await handler({ headers: {}, body: {} }, res);
-    expect(res.state.status).toBe(400);
-    expect(res.state.body).toEqual({ error: 'INVALID_PLAY_PURCHASE_INPUT' });
+    expect(res.state.status).toBe(401);
+    expect(res.state.body).toEqual({ error: 'FIREBASE_ID_TOKEN_MISSING' });
   });
 
   it('requires authentication for lifecycle status sync', async () => {
