@@ -6,6 +6,9 @@ def basiraKeyAlias = System.getenv('BASIRA_KEY_ALIAS')
 def basiraKeyPassword = System.getenv('BASIRA_KEY_PASSWORD')
 def hasReleaseSigning = basiraKeystorePath && basiraKeystorePassword && basiraKeyAlias && basiraKeyPassword
 
+def admobAppId = System.getenv('ADMOB_APP_ID') ?: 'ca-app-pub-3940256099942544~3347511713'
+def admobRewardedAdUnitId = System.getenv('ADMOB_REWARDED_AD_UNIT_ID') ?: 'ca-app-pub-3940256099942544/5224354917'
+
 android {
     namespace = "com.basira.spiritportal"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,9 +19,13 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders = [
+            admobAppId: admobAppId,
+            admobRewardedAdUnitId: admobRewardedAdUnitId
+        ]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+             // Default: https://android.googlesource.com/platforms/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
@@ -42,6 +49,13 @@ android {
     }
 }
 
+gradle.taskGraph.whenReady { graph ->
+    def buildingRelease = graph.allTasks.any { it.name.toLowerCase().contains('release') }
+    if (buildingRelease && (!System.getenv('ADMOB_APP_ID') || !System.getenv('ADMOB_REWARDED_AD_UNIT_ID'))) {
+        throw new GradleException('Release builds require ADMOB_APP_ID and ADMOB_REWARDED_AD_UNIT_ID; test AdMob IDs must never ship.')
+    }
+}
+
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
@@ -53,6 +67,8 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "com.google.android.gms:play-services-ads:25.5.0"
+    implementation "com.google.android.ump:user-messaging-platform:4.0.0"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
