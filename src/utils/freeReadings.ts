@@ -4,16 +4,21 @@ export type FreeReadingType = 'palmistry' | 'coffee';
 export type MeteredReadingType = FreeReadingType | 'tarot' | 'divination';
 export const FREE_READINGS_PER_TYPE = 3;
 
-export function isPremiumProfile(profile: { vipStatus?: unknown } | null | undefined): boolean {
+type ReadingProfile = { vipStatus?: unknown; freeReadings?: Record<string, unknown> } | null | undefined;
+
+export function isPremiumProfile(profile: ReadingProfile): boolean {
     return profile?.vipStatus === 'adept' || profile?.vipStatus === 'oracle';
 }
 
-export function usedFreeReadings(profile: { freeReadings?: Record<string, unknown> } | null, type: FreeReadingType): number {
+export function usedFreeReadings(profile: ReadingProfile, type: FreeReadingType): number {
     const used = profile?.freeReadings?.[type];
     return typeof used === 'number' && Number.isInteger(used) && used >= 0 ? used : 0;
 }
 
-export function remainingFreeReadings(profile: { freeReadings?: Record<string, unknown> } | null, type: FreeReadingType): number {
+export function remainingFreeReadings(profile: ReadingProfile, type: FreeReadingType): number {
+    // Reading views use this value as their pre-scan gate. A verified premium
+    // profile stays above zero so it never falls into the rewarded-ad/energy path.
+    if (isPremiumProfile(profile)) return FREE_READINGS_PER_TYPE;
     return Math.max(0, FREE_READINGS_PER_TYPE - usedFreeReadings(profile, type));
 }
 
