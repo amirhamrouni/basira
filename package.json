@@ -26,6 +26,7 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.1.0",
     "@capacitor-firebase/authentication": "^8.5.1",
     "@capacitor/android": "^8.4.0",
     "@capacitor/app": "^8.1.1",
