@@ -60,6 +60,15 @@ const provider = new GoogleAuthProvider();
 provider.addScope('email');
 provider.addScope('profile');
 
+const signInWithNativeGoogle = async () => {
+    try {
+        return await FirebaseAuthentication.signInWithGoogle();
+    } catch (credentialManagerError) {
+        console.warn('Google Credential Manager sign-in failed; retrying with the legacy Google flow.', credentialManagerError);
+        return FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
+    }
+};
+
 const ensureUserProfile = async (currentUser: User) => {
     const userRef = doc(db, 'users', currentUser.uid);
     try {
@@ -216,7 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const lang = AppStateManager.get('lang') || 'ar';
         try {
             if (Capacitor.isNativePlatform()) {
-                const result = await FirebaseAuthentication.signInWithGoogle();
+                const result = await signInWithNativeGoogle();
                 const idToken = result.credential?.idToken;
                 if (!idToken) throw Object.assign(new Error('Native Google Sign-In returned no ID token.'), { code: 'auth/native-google-configuration' });
                 const credential = GoogleAuthProvider.credential(idToken);
@@ -234,7 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 'auth/configuration-not-found',
                 'auth/native-google-configuration'
             ]);
-            const normalized = Capacitor.isNativePlatform() && (!authErr.code || nativeSetupCodes.has(authErr.code))
+            const normalized = Capacitor.isNativePlatform() && nativeSetupCodes.has(authErr.code)
                 ? Object.assign(authErr, { code: 'auth/native-google-configuration' })
                 : authErr;
             setAuthError(getAuthErrorMessage(normalized, lang));
