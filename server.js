@@ -7,6 +7,7 @@ import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { registerPlayBillingRoutes } from './server/playBillingRoutes.js';
 
 dotenv.config();
 
@@ -799,6 +800,8 @@ FORBIDDEN inside the reading: "AI", clinical claims, protected/sensitive trait i
     // ─────────────────────────────────────────────────────────────────────────
     // Static/Dev Server Setup
     // ─────────────────────────────────────────────────────────────────────────
+    registerPlayBillingRoutes(app);
+
     app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found' }));
 
     const isProd = process.env.NODE_ENV === 'production';
