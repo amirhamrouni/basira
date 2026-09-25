@@ -32,8 +32,8 @@ export function remainingFreeReadings(profile: ReadingMeterProfile, type: FreeRe
 // The profile update and reading history entry commit together. The transaction
 // checks current server values so concurrent reads cannot use one free slot twice.
 // Premium entitlement is server-controlled by vipStatus and never spends energy.
-// A rewardedUnlock represents one native rewarded-ad completion and unlocks one
-// reading without touching the Energy balance.
+// Palm/coffee require one rewarded unlock after their three free readings; Energy
+// is kept only for reading types whose product model still uses Energy.
 export async function saveMeteredReading(
     db: Firestore,
     userId: string,
@@ -52,10 +52,17 @@ export async function saveMeteredReading(
         const freeUsed = isFreeEligible ? usedFreeReadings(data, type) : FREE_READINGS_PER_TYPE;
 
         let payment: ReadingPayment;
-        if (isVip) payment = 'vip';
-        else if (isFreeEligible && freeUsed < FREE_READINGS_PER_TYPE) payment = 'free';
-        else if (isFreeEligible && options.rewardedUnlock) payment = 'rewarded';
-        else payment = 'energy';
+        if (isVip) {
+            payment = 'vip';
+        } else if (isFreeEligible && freeUsed < FREE_READINGS_PER_TYPE) {
+            payment = 'free';
+        } else if (isFreeEligible && options.rewardedUnlock) {
+            payment = 'rewarded';
+        } else if (isFreeEligible) {
+            throw new Error('REWARDED_UNLOCK_REQUIRED');
+        } else {
+            payment = 'energy';
+        }
 
         if (payment === 'energy' && (!(typeof data.energy === 'number') || data.energy < 15)) {
             throw new Error('INSUFFICIENT_ENERGY');
