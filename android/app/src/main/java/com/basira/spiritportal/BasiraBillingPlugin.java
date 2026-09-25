@@ -11,16 +11,14 @@ import com.android.billingclient.api.ProductDetails;
 import com.android.billingclient.api.Purchase;
 import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.QueryProductDetailsParams;
-import com.android.billingclient.api.QueryProductDetailsResult;
 import com.android.billingclient.api.QueryPurchasesParams;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.PluginMethod;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -94,7 +92,6 @@ public class BasiraBillingPlugin extends Plugin implements PurchasesUpdatedListe
         for (ProductDetails.SubscriptionOfferDetails offer : offers) {
             if (!basePlanId.equals(offer.getBasePlanId())) continue;
             if (fallback == null) fallback = offer;
-            // Prefer the base-plan offer itself when Play returns it (offerId == null).
             if (offer.getOfferId() == null) return offer;
         }
         return fallback;
