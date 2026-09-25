@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createPlayBillingVerifyHandler } from './playBillingRoutes.js';
+import {
+  createPlayBillingStatusHandler,
+  createPlayBillingVerifyHandler,
+} from './playBillingRoutes.js';
 
 function makeResponse() {
   const state = { status: 200, body: null };
@@ -20,6 +23,14 @@ function makeResponse() {
 describe('Google Play billing verification route', () => {
   it('requires a Firebase bearer token', async () => {
     const handler = createPlayBillingVerifyHandler({ env: {} });
+    const res = makeResponse();
+    await handler({ headers: {}, body: {} }, res);
+    expect(res.state.status).toBe(400);
+    expect(res.state.body).toEqual({ error: 'INVALID_PLAY_PURCHASE_INPUT' });
+  });
+
+  it('requires authentication for lifecycle status sync', async () => {
+    const handler = createPlayBillingStatusHandler({ env: {} });
     const res = makeResponse();
     await handler({ headers: {}, body: {} }, res);
     expect(res.state.status).toBe(401);
@@ -58,7 +69,7 @@ describe('Google Play billing verification route', () => {
     expect(res.state.body).toEqual({ error: 'PLAY_BILLING_SERVER_NOT_CONFIGURED' });
   });
 
-  it('keeps the verification route registered before the generic API 404', () => {
+  it('keeps billing routes registered before the generic API 404', () => {
     const source = fs.readFileSync('server.js', 'utf8');
     const registration = source.indexOf('registerPlayBillingRoutes(app);');
     const api404 = source.indexOf("app.use('/api', (req, res) => res.status(404)");
