@@ -42,3 +42,10 @@ Treat them as the current handoff and update both after every verified milestone
 - Grant it only from the rewarded callback.
 - Handle reward, dismiss, failure, and timeout paths so the UI cannot hang.
 
+## Palm-reading invariants
+
+- Any image containing a genuine visible human palm is valid, even when fine lines are faint or lighting is uneven.
+- Reject only when no palm is visible or the image is unusable.
+- Never restore `ERROR_PALM_LINES_UNREADABLE` as a user-facing rejection.
+- When detail is limited, complete a smaller reading from visible contours, proportions, mounts, or major lines without inventing marks.
+- Keep the regression test for `PALM_READING_GUARD` passing.
