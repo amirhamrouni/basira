@@ -42,7 +42,7 @@ export async function createGoogleAccessToken(serviceAccount, fetchImpl = fetch)
   const assertion = `${unsigned}.${base64Url(signature)}`;
 
   const body = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth-type:jwt-bearer'.replace('oauth-type', 'oauth-grant-type'),
+    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
     assertion,
   });
   const response = await fetchImpl(GOOGLE_TOKEN_URL, {
@@ -101,6 +101,15 @@ export function inspectSubscriptionPurchase(data, expectedProductId, options = {
 
   if (options.expectedObfuscatedAccountId) {
     const external = data.externalAccountIdentifiers?.obfuscatedExternalAccountId;
+    if (!external && options.requireObfuscatedAccountId) {
+      return {
+        entitled: false,
+        reason: 'ACCOUNT_ID_MISSING',
+        state,
+        expiryTime: lineItem.expiryTime || null,
+        acknowledgementPending,
+      };
+    }
     if (external && external !== options.expectedObfuscatedAccountId) {
       return {
         entitled: false,
@@ -193,8 +202,6 @@ export async function claimPurchaseToken({
 }) {
   const tokenHash = sha256Hex(purchaseToken);
   const createdAt = new Date().toISOString();
-  const path = 'playPurchases';
-  const query = `?documentId=${encodeURIComponent(tokenHash)}`;
   const body = {
     fields: {
       uid: firestoreValue(uid),
@@ -205,9 +212,9 @@ export async function claimPurchaseToken({
   const created = await firestoreRequest({
     serviceAccount,
     accessToken,
-    path,
+    path: 'playPurchases',
     method: 'POST',
-    query,
+    query: `?documentId=${encodeURIComponent(tokenHash)}`,
     body,
     fetchImpl,
   });
