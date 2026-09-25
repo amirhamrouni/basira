@@ -119,7 +119,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
             <div className={`w-full max-w-[340px] h-80 rounded-[40px] relative overflow-hidden flex flex-col items-center justify-center cursor-pointer transition-all duration-700 shadow-md ${imagePreview ? 'border-2 border-stella-gold bg-white' : 'border-[3px] border-dashed border-stella-gold/30 bg-gray-50 hover:bg-stella-gold/5'}`} onClick={() => !isScanning && (Capacitor.isNativePlatform() ? void pickPhoto('gallery') : fileRef.current?.click())}>
                 {imagePreview ? (
                     <>
-                        <img src={imagePreview} alt="Palm" className="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-80" />
+                        <img src={imagePreview} alt="Palm" className="absolute inset-0 w-full h-full object-cover" />
                         {isScanning && <motion.div className="absolute left-0 w-full h-[4px] bg-stella-gold shadow-[0_0_20px_5px_#D4AF37]" animate={{ top: ['0%', '100%', '0%'] }} transition={{ duration: 2.2, repeat: Infinity, ease: 'linear' }} />}
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
                     </>
