@@ -67,6 +67,8 @@ export function startWithStrongSignals(reply) {
     return index > 0 && index < 500 ? reply.slice(index) : reply;
 }
 
+export const PALM_READING_GUARD = `Identify whether a human palm is visible before judging fine-line sharpness. Any genuine visible palm is a valid input, including a palm photographed in dim or uneven light. Reject with ERROR_NOT_A_PALM only when no human palm is visible or the image is unusable. Never reject a visible palm merely because fine lines are faint. Build the reading from whatever is genuinely visible: major lines, branches, intersections, contours, finger proportions and palm mounts. Use fewer signals when detail is limited and briefly name which fine detail could benefit from a clearer photo, while still completing the reading. Never invent a mark or interpret the absence of a mark.`;
+
 export function parseImageDataUrl(value) {
     if (typeof value !== 'string') return null;
     const match = value.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
@@ -576,7 +578,7 @@ Additional coffee rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify whether a human palm is visible before judging line sharpness. Reject with ERROR_NOT_A_PALM only if no human palm is visible. If a real palm is visible but no line, intersection or distinct contour can genuinely be distinguished, reply EXACTLY ERROR_PALM_LINES_UNREADABLE. Never call missing or unclear lines a signal. Describe only marks actually visible BEFORE their traditional interpretation. Connect the strongest visible mark, its location and a second mark when visible into one conditional scenario. If fewer than three marks are visible, provide only the real marks; never use absence as a sign or forecast love, work or money from it.' },
+                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\n' + PALM_READING_GUARD },
                         { inlineData: image }
                     ],
                     config: { temperature: 0.45, maxOutputTokens: 1050 }
@@ -586,7 +588,22 @@ Additional coffee rules:
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
             if (reply === 'ERROR_NOT_A_PALM' || reply.startsWith('ERROR_NOT_A_PALM')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE' });
-            if (reply.startsWith('ERROR_PALM_LINES_UNREADABLE')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE', reply: lang === 'ar' ? 'راحة اليد ظاهرة، لكن الخطوط ما تتقراش في الصورة. صوّرها بإضاءة أمامية أوضح.' : 'Your palm is visible, but its lines are not readable. Take another photo in brighter front light.' });
+            // Backward compatibility for a model that still emits the removed
+            // unreadable-lines sentinel: retry as a valid, limited reading.
+            if (reply.startsWith('ERROR_PALM_LINES_UNREADABLE')) {
+                const retry = await generateWithRetry(() =>
+                    generateContent({
+                        contents: [
+                            { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nThe image contains a valid human palm. Complete a limited reading using only visible contours, proportions, mounts or major lines. Do not reject it and do not invent fine marks.\n\n' + (context || '') + '\n\n' + (prompt || '') },
+                            { inlineData: image }
+                        ],
+                        config: { temperature: 0.45, maxOutputTokens: 1050 }
+                    })
+                );
+                const retryReply = retry.text?.trim();
+                if (!retryReply || retryReply.startsWith('ERROR_')) throw new Error('Palm retry returned no reading');
+                return res.json({ reply: startWithStrongSignals(retryReply) });
+            }
             return res.json({ reply: startWithStrongSignals(reply) });
         } catch (e) {
             console.error('[Palmistry API] Error:', e.message);
