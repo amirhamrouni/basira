@@ -4,7 +4,7 @@
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "branch": "feat/basira-context-engine",
-  "last_verified_code_head": "35a6458dedb8ca861d4ce68d863e1c8690951251",
+  "last_verified_code_head": "0cd221d36aa9f211c27ed2901a6bec2c506f3a36",
   "android": {
     "application_id": "com.basira.spiritportal",
     "version_name": "1.0",
