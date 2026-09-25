@@ -2,6 +2,7 @@ import { collection, doc, runTransaction, type Firestore } from 'firebase/firest
 
 export type FreeReadingType = 'palmistry' | 'coffee';
 export type MeteredReadingType = FreeReadingType | 'tarot' | 'divination';
+export type ReadingPayment = 'free' | 'energy' | 'vip' | 'rewarded';
 export const FREE_READINGS_PER_TYPE = 3;
 
 export type ReadingMeterProfile = {
@@ -9,6 +10,10 @@ export type ReadingMeterProfile = {
     vipStatus?: string;
     energy?: number;
 } | null;
+
+export type MeteredReadingOptions = {
+    rewardedUnlock?: boolean;
+};
 
 export function hasUnlimitedReadings(profile: ReadingMeterProfile): boolean {
     return profile?.vipStatus === 'adept' || profile?.vipStatus === 'oracle';
@@ -27,7 +32,15 @@ export function remainingFreeReadings(profile: ReadingMeterProfile, type: FreeRe
 // The profile update and reading history entry commit together. The transaction
 // checks current server values so concurrent reads cannot use one free slot twice.
 // Premium entitlement is server-controlled by vipStatus and never spends energy.
-export async function saveMeteredReading(db: Firestore, userId: string, type: MeteredReadingType, result: string): Promise<'free' | 'energy' | 'vip'> {
+// A rewardedUnlock represents one native rewarded-ad completion and unlocks one
+// reading without touching the Energy balance.
+export async function saveMeteredReading(
+    db: Firestore,
+    userId: string,
+    type: MeteredReadingType,
+    result: string,
+    options: MeteredReadingOptions = {}
+): Promise<ReadingPayment> {
     const userRef = doc(db, 'users', userId);
     const readingRef = doc(collection(db, 'users', userId, 'readings'));
     return runTransaction(db, async transaction => {
@@ -37,11 +50,12 @@ export async function saveMeteredReading(db: Firestore, userId: string, type: Me
         const isVip = hasUnlimitedReadings(data);
         const isFreeEligible = type === 'palmistry' || type === 'coffee';
         const freeUsed = isFreeEligible ? usedFreeReadings(data, type) : FREE_READINGS_PER_TYPE;
-        const payment: 'free' | 'energy' | 'vip' = isVip
-            ? 'vip'
-            : isFreeEligible && freeUsed < FREE_READINGS_PER_TYPE
-                ? 'free'
-                : 'energy';
+
+        let payment: ReadingPayment;
+        if (isVip) payment = 'vip';
+        else if (isFreeEligible && freeUsed < FREE_READINGS_PER_TYPE) payment = 'free';
+        else if (isFreeEligible && options.rewardedUnlock) payment = 'rewarded';
+        else payment = 'energy';
 
         if (payment === 'energy' && (!(typeof data.energy === 'number') || data.energy < 15)) {
             throw new Error('INSUFFICIENT_ENERGY');
