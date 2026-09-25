@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { Fingerprint, CheckCircle2, Share2, Save } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db, analytics } from '../firebase';
-import { doc, updateDoc, increment } from 'firebase/firestore';
 import { logEvent } from 'firebase/analytics';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 import BasiraReadingText from '../components/BasiraReadingText';
@@ -12,7 +11,7 @@ import { shareReading } from '../utils/shareResult';
 import { getApiUrl } from '../utils/api';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { remainingFreeReadings, saveMeteredReading } from '../utils/freeReadings';
+import { hasUnlimitedReadings, remainingFreeReadings, saveMeteredReading } from '../utils/freeReadings';
 import { Capacitor } from '@capacitor/core';
 import { pickNativeReadingImage } from '../utils/readingImagePicker';
 
@@ -21,6 +20,10 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
     const fileRef = useRef<HTMLInputElement>(null);
     const { user, profile, login } = useAuth();
     const [showRewardModal, setShowRewardModal] = useState(false);
+    const [rewardedUnlock, setRewardedUnlock] = useState(false);
+    const isPremium = hasUnlimitedReadings(profile);
+    const freeLeft = remainingFreeReadings(profile, 'palmistry');
+
     const pickPhoto = async (source: 'camera' | 'gallery') => {
         try {
             const image = await pickNativeReadingImage('palmistry', source);
@@ -51,10 +54,13 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
             login();
             return;
         }
-        if (remainingFreeReadings(profile, 'palmistry') === 0 && profile.energy < 15) {
+
+        const needsRewardedUnlock = !isPremium && freeLeft === 0;
+        if (needsRewardedUnlock && !rewardedUnlock) {
             setShowRewardModal(true);
             return;
         }
+        const useRewardedUnlock = needsRewardedUnlock && rewardedUnlock;
 
         setState((current: any) => ({ ...current, isScanning: true, reading: null, error: null }));
 
@@ -92,18 +98,26 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                 return;
             }
 
-            await saveMeteredReading(db, user.uid, 'palmistry', generatedReading);
+            await saveMeteredReading(db, user.uid, 'palmistry', generatedReading, { rewardedUnlock: useRewardedUnlock });
+            if (useRewardedUnlock) setRewardedUnlock(false);
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
             rememberReading(user.uid, 'palm', generatedReading);
             if (analytics) logEvent(analytics, 'ai_reading_completed', { type: 'palmistry' });
         } catch (err) {
             console.error('Palmistry reading failed', err);
-            setState((current: any) => ({ ...current, reading: null, error: lang === 'ar' ? 'تعذّر إكمال قراءة الكف الآن. لم تُحفظ قراءة ولم تُخصم طاقة؛ حاول بنفس الصورة مجدداً.' : 'The palm reading could not be completed. Nothing was saved or charged; please retry.', isScanning: false }));
+            setState((current: any) => ({ ...current, reading: null, error: lang === 'ar' ? 'تعذّر إكمال قراءة الكف الآن. لم تُحفظ قراءة ولم تُستهلك فتحة الإعلان؛ حاول بنفس الصورة مجدداً.' : 'The palm reading could not be completed. Nothing was saved and the ad unlock was not consumed; please retry.', isScanning: false }));
             if (analytics) logEvent(analytics, 'ai_reading_failed', { type: 'palmistry' });
         }
     };
 
     const handleShare = () => shareReading(lang === 'ar' ? 'قراءتي من بصيرة' : 'My Basira Palm Reading', reading);
+    const accessLabel = isPremium
+        ? (lang === 'ar' ? 'اشتراك مفتوح' : 'Premium')
+        : freeLeft > 0
+            ? (lang === 'ar' ? `مجانية ${freeLeft}/3` : `Free ${freeLeft}/3`)
+            : rewardedUnlock
+                ? (lang === 'ar' ? 'مفتوحة بالإعلان' : 'Ad unlock ready')
+                : (lang === 'ar' ? 'إعلان أو اشتراك' : 'Ad or subscription');
 
     return (
         <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col items-center w-full">
@@ -138,7 +152,7 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
             {isScanning && <div className="mt-8 text-stella-gold text-sm font-bold animate-pulse tracking-wider drop-shadow-sm">{t.readingLoading}</div>}
             {error && !isScanning && <div role="alert" className="mt-6 w-full max-w-[340px] rounded-2xl border border-red-400/30 bg-red-950/30 p-4 text-center text-sm leading-7 text-red-200">{error}</div>}
 
-            {imagePreview && !reading && !isScanning && <button onClick={triggerScan} className="w-full max-w-[340px] mt-8 bg-stella-gold text-white font-extrabold py-4 rounded-2xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-lg">{t.scanBtn} <span className="text-xs ml-2 opacity-90">{remainingFreeReadings(profile, 'palmistry') > 0 ? (lang === 'ar' ? `مجانية ${remainingFreeReadings(profile, 'palmistry')}/3` : `Free ${remainingFreeReadings(profile, 'palmistry')}/3`) : '15 Energy'}</span></button>}
+            {imagePreview && !reading && !isScanning && <button onClick={triggerScan} className="w-full max-w-[340px] mt-8 bg-stella-gold text-white font-extrabold py-4 rounded-2xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-lg">{t.scanBtn} <span className="text-xs ml-2 opacity-90">{accessLabel}</span></button>}
 
             {reading && (
                 <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="w-full mt-8 mb-6">
@@ -154,7 +168,15 @@ export default function PalmistryView({ t, adminPrompt, lang, state, setState, b
                 </motion.div>
             )}
 
-            <CosmicRewardModal isOpen={showRewardModal} onClose={() => setShowRewardModal(false)} onRewardComplete={async () => { if (user) await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) }); setShowRewardModal(false); }} lang={lang} rewardType="insight" title={lang === 'ar' ? 'نفدت طاقتك الكونية' : 'Cosmic Energy Depleted'} description={lang === 'ar' ? 'تحتاج إلى 15 طاقة. أكمل خطوة الاستعادة للمتابعة.' : 'You need 15 Energy. Complete the recovery step to continue.'} />
+            <CosmicRewardModal
+                isOpen={showRewardModal}
+                onClose={() => setShowRewardModal(false)}
+                onRewardComplete={() => setRewardedUnlock(true)}
+                lang={lang}
+                rewardType="insight"
+                title={lang === 'ar' ? 'انتهت القراءات المجانية' : 'Free readings used'}
+                description={lang === 'ar' ? 'شاهد إعلاناً مكافِئاً لفتح قراءة كف واحدة، أو استخدم اشتراكاً مفتوحاً.' : 'Watch one rewarded ad to unlock one palm reading, or use an active subscription.'}
+            />
         </motion.div>
     );
 }
