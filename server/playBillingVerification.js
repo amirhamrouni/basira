@@ -42,7 +42,7 @@ export async function createGoogleAccessToken(serviceAccount, fetchImpl = fetch)
   const assertion = `${unsigned}.${base64Url(signature)}`;
 
   const body = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    grant_type: 'urn:ietf:params:oauth-type:jwt-bearer'.replace('oauth-type', 'oauth-grant-type'),
     assertion,
   });
   const response = await fetchImpl(GOOGLE_TOKEN_URL, {
@@ -170,18 +170,58 @@ async function firestoreRequest({ serviceAccount, accessToken, path, method = 'G
   return { response, data };
 }
 
-export async function assertPurchaseTokenOwnership({ serviceAccount, accessToken, purchaseToken, uid, fetchImpl = fetch }) {
+export async function readPurchaseTokenOwner({ serviceAccount, accessToken, purchaseToken, fetchImpl = fetch }) {
   const tokenHash = sha256Hex(purchaseToken);
-  const path = `playPurchases/${tokenHash}`;
-  const { response, data } = await firestoreRequest({ serviceAccount, accessToken, path, fetchImpl });
-  if (response.status === 404) return { tokenHash, existing: false };
+  const { response, data } = await firestoreRequest({
+    serviceAccount,
+    accessToken,
+    path: `playPurchases/${tokenHash}`,
+    fetchImpl,
+  });
+  if (response.status === 404) return { tokenHash, existing: false, uid: null };
   if (!response.ok) throw new Error(`FIRESTORE_PURCHASE_LOOKUP_FAILED:${response.status}`);
-  const existingUid = data.fields?.uid?.stringValue;
-  if (existingUid && existingUid !== uid) throw new Error('PURCHASE_TOKEN_ALREADY_BOUND');
+  return { tokenHash, existing: true, uid: data.fields?.uid?.stringValue || null };
+}
+
+export async function claimPurchaseToken({
+  serviceAccount,
+  accessToken,
+  purchaseToken,
+  uid,
+  productId,
+  fetchImpl = fetch,
+}) {
+  const tokenHash = sha256Hex(purchaseToken);
+  const createdAt = new Date().toISOString();
+  const path = 'playPurchases';
+  const query = `?documentId=${encodeURIComponent(tokenHash)}`;
+  const body = {
+    fields: {
+      uid: firestoreValue(uid),
+      productId: firestoreValue(productId),
+      createdAt: { timestampValue: createdAt },
+    },
+  };
+  const created = await firestoreRequest({
+    serviceAccount,
+    accessToken,
+    path,
+    method: 'POST',
+    query,
+    body,
+    fetchImpl,
+  });
+  if (created.response.ok) return { tokenHash, existing: false };
+  if (created.response.status !== 409) {
+    throw new Error(`FIRESTORE_PURCHASE_CLAIM_FAILED:${created.response.status}`);
+  }
+
+  const owner = await readPurchaseTokenOwner({ serviceAccount, accessToken, purchaseToken, fetchImpl });
+  if (owner.uid !== uid) throw new Error('PURCHASE_TOKEN_ALREADY_BOUND');
   return { tokenHash, existing: true };
 }
 
-export async function persistVerifiedEntitlement({
+async function writePurchaseState({
   serviceAccount,
   accessToken,
   uid,
@@ -210,6 +250,29 @@ export async function persistVerifiedEntitlement({
     fetchImpl,
   });
   if (!purchaseWrite.response.ok) throw new Error(`FIRESTORE_PURCHASE_WRITE_FAILED:${purchaseWrite.response.status}`);
+  return { tokenHash, updatedAt };
+}
+
+export async function persistSubscriptionDecision({
+  serviceAccount,
+  accessToken,
+  uid,
+  purchaseToken,
+  productId,
+  tier,
+  inspection,
+  fetchImpl = fetch,
+}) {
+  const { tokenHash, updatedAt } = await writePurchaseState({
+    serviceAccount,
+    accessToken,
+    uid,
+    purchaseToken,
+    productId,
+    tier,
+    inspection,
+    fetchImpl,
+  });
 
   const subscriptionFields = {
     productId: firestoreValue(productId),
@@ -221,7 +284,39 @@ export async function persistVerifiedEntitlement({
     testPurchase: firestoreValue(inspection.testPurchase),
     updatedAt: { timestampValue: updatedAt },
   };
-  const userWrite = await firestoreRequest({
+
+  if (inspection.entitled) {
+    const userWrite = await firestoreRequest({
+      serviceAccount,
+      accessToken,
+      path: `users/${encodeURIComponent(uid)}`,
+      method: 'PATCH',
+      query: '?updateMask.fieldPaths=vipStatus&updateMask.fieldPaths=playSubscription',
+      body: {
+        fields: {
+          vipStatus: firestoreValue(tier),
+          playSubscription: { mapValue: { fields: subscriptionFields } },
+        },
+      },
+      fetchImpl,
+    });
+    if (!userWrite.response.ok) throw new Error(`FIRESTORE_ENTITLEMENT_WRITE_FAILED:${userWrite.response.status}`);
+    return { tokenHash, tier, entitled: true, updatedAt };
+  }
+
+  const current = await firestoreRequest({
+    serviceAccount,
+    accessToken,
+    path: `users/${encodeURIComponent(uid)}`,
+    fetchImpl,
+  });
+  if (!current.response.ok) throw new Error(`FIRESTORE_USER_LOOKUP_FAILED:${current.response.status}`);
+  const currentTokenHash = current.data.fields?.playSubscription?.mapValue?.fields?.purchaseTokenHash?.stringValue;
+  if (currentTokenHash !== tokenHash) {
+    return { tokenHash, entitled: false, revokedCurrentEntitlement: false, updatedAt };
+  }
+
+  const revokeWrite = await firestoreRequest({
     serviceAccount,
     accessToken,
     path: `users/${encodeURIComponent(uid)}`,
@@ -229,13 +324,12 @@ export async function persistVerifiedEntitlement({
     query: '?updateMask.fieldPaths=vipStatus&updateMask.fieldPaths=playSubscription',
     body: {
       fields: {
-        vipStatus: firestoreValue(tier),
+        vipStatus: firestoreValue('none'),
         playSubscription: { mapValue: { fields: subscriptionFields } },
       },
     },
     fetchImpl,
   });
-  if (!userWrite.response.ok) throw new Error(`FIRESTORE_ENTITLEMENT_WRITE_FAILED:${userWrite.response.status}`);
-
-  return { tokenHash, tier, updatedAt };
+  if (!revokeWrite.response.ok) throw new Error(`FIRESTORE_ENTITLEMENT_REVOKE_FAILED:${revokeWrite.response.status}`);
+  return { tokenHash, entitled: false, revokedCurrentEntitlement: true, updatedAt };
 }
