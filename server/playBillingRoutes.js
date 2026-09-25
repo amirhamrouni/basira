@@ -125,6 +125,10 @@ async function persistAndAcknowledge({
 export function createPlayBillingVerifyHandler({ env = process.env, fetchImpl = fetch } = {}) {
   return async function verifyGooglePlaySubscription(req, res) {
     try {
+      if (!bearerToken(req.headers?.authorization)) {
+        return res.status(401).json({ error: 'FIREBASE_ID_TOKEN_MISSING' });
+      }
+
       const purchaseToken = safeString(req.body?.purchaseToken, 4096);
       const productId = safeString(req.body?.productId, 256);
       if (!purchaseToken || !productId) {
