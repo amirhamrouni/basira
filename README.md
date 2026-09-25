@@ -1,5 +1,7 @@
 # BASIRA
 
+> Agent handoff: read [`AGENTS.md`](AGENTS.md), [`docs/WORK_STATE.md`](docs/WORK_STATE.md), and [`docs/work-state.json`](docs/work-state.json) before changing the project.
+
 BASIRA is a multilingual spiritual-entertainment application for web and Android. It combines daily zodiac content, tarot, palm, coffee-cup, and face readings with Firebase accounts and saved reading history.
 
 > Readings are for entertainment and personal reflection. They are not medical, legal, financial, or psychological advice.

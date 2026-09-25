@@ -53,6 +53,25 @@ if (!fs.existsSync(googleServices)) {
       failed = true;
     } else {
       console.log('PASS google-services Android package');
+      const oauthClients = androidClient.oauth_client || [];
+      const androidOauthClient = oauthClients.find(client =>
+        client.client_type === 1 &&
+        client.android_info?.package_name === 'com.basira.spiritportal' &&
+        client.android_info?.certificate_hash
+      );
+      const webOauthClient = oauthClients.find(client => client.client_type === 3 && client.client_id);
+      if (!androidOauthClient) {
+        console.error('FAIL google-services.json has no Android OAuth client with a signing certificate.');
+        failed = true;
+      } else {
+        console.log('PASS google-services Android OAuth signing certificate');
+      }
+      if (!webOauthClient) {
+        console.error('FAIL google-services.json has no Web OAuth client for Google ID tokens.');
+        failed = true;
+      } else {
+        console.log('PASS google-services Web OAuth client');
+      }
     }
   } catch {
     console.error('FAIL google-services.json is invalid JSON.');
