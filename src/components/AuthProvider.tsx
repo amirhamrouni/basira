@@ -13,6 +13,8 @@ import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, db, analytics } from '../firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { logEvent } from 'firebase/analytics';
+import { getApiUrl } from '../utils/api';
+import { AppStateManager } from '../utils/AppStateManager';
 
 export interface UserProfile {
     energy: number;
@@ -107,6 +109,18 @@ const ensureUserProfile = async (currentUser: User) => {
     }
 };
 
+const syncPlayBillingEntitlement = async (currentUser: User) => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+    const idToken = await currentUser.getIdToken();
+    const response = await fetch(getApiUrl('/api/billing/google-play/status'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (response.ok || response.status === 503) return;
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.error || `PLAY_BILLING_STATUS_HTTP_${response.status}`);
+};
+
 const getAuthErrorMessage = (error: AuthError, lang: string = 'ar'): string => {
     const messages: Record<string, Record<string, string>> = {
         'auth/popup-blocked': {
@@ -157,8 +171,6 @@ const getAuthErrorMessage = (error: AuthError, lang: string = 'ar'): string => {
         : `Login error: ${error.message}`;
 };
 
-import { AppStateManager } from '../utils/AppStateManager';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -191,6 +203,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     console.error('Profile setup failed:', error);
                     setProfileError((error as { code?: string }).code || 'unknown');
                 }
+
+                void syncPlayBillingEntitlement(currentUser).catch(error => {
+                    console.warn('Google Play entitlement sync failed:', error);
+                });
 
                 const userRef = doc(db, 'users', currentUser.uid);
                 unsubscribeProfile = onSnapshot(
