@@ -74,11 +74,12 @@ This file is the handoff for future ChatGPT/Codex sessions. Continue from this s
 - `d65bb3b`: added the native Google sign-in fallback and removed false generic SHA classification.
 - `35a6458`: added Android OAuth and Web OAuth build validation.
 - `edd82d0`: linked this persistent handoff from the repository README.
+- `e0ede8b`: hotfix merged into `main`; visible palms are accepted even when fine lines are faint, the API retries a limited reading, and the dark preview filter was removed.
 
 ## Verified build results
 
 - TypeScript: PASS
-- Automated tests: 14/14 PASS
+- Automated tests: 15/15 PASS
 - Vite production build: PASS
 - Capacitor Android sync: PASS
 - Android auth prebuild gate: PASS
@@ -92,6 +93,15 @@ This file is the handoff for future ChatGPT/Codex sessions. Continue from this s
 3. If it succeeds, record `google_sign_in_device: pass` in `docs/work-state.json`.
 4. If it fails, capture the new on-screen error. The build now exposes the actual error instead of the false SHA message.
 5. After login passes, test rewarded ads after the three free readings, then continue the subscription and Play Console release work.
+
+## Palm regression resolved on 2026-09-25
+
+- Cause: later commit `a5d5bfb` restored `ERROR_PALM_LINES_UNREADABLE`, undoing the earlier visible-palm acceptance fix.
+- Production fix: merged to `main` as `e0ede8b39fcb1ff633f3554fee3f5793e7bccbe0`.
+- Production verification: `https://basira-1-2fwh.onrender.com/api/health` returned healthy with Gemini ready; the served palm UI contains the new unfiltered preview asset.
+- Rule: a visible palm must receive a limited grounded reading; faint fine lines alone cannot reject it.
+- APK: `BASIRA-palm-hotfix.apk`
+- APK SHA-256: `1263163097af98a08740cdde27802b731cf24284f1eb65a62dc17a2a4f2e4532`
 
 ## Known operational details
 
