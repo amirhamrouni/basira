@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-25T05:22:00+02:00",
+  "timezone": "Europe/Amsterdam",
+  "repository": "amirhamrouni/basira",
+  "branch": "feat/basira-context-engine",
+  "last_verified_code_head": "35a6458dedb8ca861d4ce68d863e1c8690951251",
+  "android": {
+    "application_id": "com.basira.spiritportal",
+    "version_name": "1.0",
+    "version_code": 1,
+    "compile_sdk": 36,
+    "target_sdk": 36,
+    "min_sdk": 24,
+    "jdk": 21,
+    "signing_certificate": {
+      "sha1": "D3:1F:0E:80:0F:45:20:5E:5B:BB:EE:DC:0A:70:12:A4:C6:A8:E6:E3",
+      "sha256": "C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68"
+    }
+  },
+  "firebase": {
+    "project_id": "gen-lang-client-0217548336",
+    "android_oauth_client_verified": true,
+    "web_oauth_client_verified": true,
+    "sha1_registered": true,
+    "sha256_registered": true
+  },
+  "google_sign_in": {
+    "credential_manager_primary": true,
+    "legacy_fallback": true,
+    "false_sha_error_mapping_removed": true,
+    "device_test": "pending"
+  },
+  "admob": {
+    "native_plugin_wired": true,
+    "simulated_timer_removed": true,
+    "reward_callback_required": true,
+    "dismiss_failure_timeout_handled": true,
+    "device_test": "pending"
+  },
+  "verification": {
+    "typescript": "pass",
+    "tests": "14/14 pass",
+    "vite_build": "pass",
+    "capacitor_sync": "pass",
+    "android_auth_gate": "pass",
+    "gradle_debug_build": "pass",
+    "apk_signature": "pass"
+  },
+  "latest_apk": {
+    "filename": "BASIRA-google-auth-fixed-v2.apk",
+    "sha256": "2f80cfb2ae8b22d3307804c85e9bf379634fc27f5c5560e0e71aa6e257fbddbe",
+    "size_bytes": 10661767,
+    "device_validation": "pending"
+  },
+  "next_steps": [
+    "Install the exact latest APK over the existing app",
+    "Complete Google sign-in on a physical Android device",
+    "Record the device result in this file",
+    "Test rewarded ad after three free readings",
+    "Complete subscription verification and Play Console release work"
+  ]
+}
