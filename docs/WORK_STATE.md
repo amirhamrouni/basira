@@ -10,7 +10,7 @@ This file is the handoff for future ChatGPT/Codex sessions. Continue from this s
 
 - Repository: `amirhamrouni/basira`
 - Working branch: `feat/basira-context-engine`
-- Latest remote fix: `35a6458dedb8ca861d4ce68d863e1c8690951251`
+- Latest remote billing milestone: `0cd221d36aa9f211c27ed2901a6bec2c506f3a36`
 - Android package: `com.basira.spiritportal`
 - Version currently built: `1.0 (1)`
 - Physical-device validation of the newest Google sign-in fallback: **pending**
