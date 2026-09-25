@@ -56,6 +56,25 @@ This file is the handoff for future ChatGPT/Codex sessions. Continue from this s
 - TypeScript, 14 tests, Vite build, Capacitor sync, and Android debug build passed.
 - Production ad delivery may still depend on AdMob app/payment review.
 
+## Play Console and payments: last known state
+
+- Rewarded AdMob unit was created and native integration is present.
+- Merchant/public address requested by the user: `Maagdenburgstraat 2, 7421 ZB Deventer`.
+- Support email requested by the user: `hamrouniamir79@gmail.com`.
+- Saving the merchant profile was not verified; revisit Play Console and confirm the visible saved values.
+- Google Play Billing subscription and server-side purchase verification are still incomplete.
+- Do not mark Stage 5/6 complete until a real rewarded ad and a real subscription test pass on device.
+
+## Repair timeline
+
+- `11b5d9a`: replaced the simulated reward timer with a native rewarded-ad event.
+- `4a33df4`: synchronized generated Android AdMob plugin files.
+- `8f05e58`: added rewarded, dismissed, failed-to-show, and timeout handling.
+- `5909e2a`: made CI signing behavior explicit when the signing secret is missing.
+- `d65bb3b`: added the native Google sign-in fallback and removed false generic SHA classification.
+- `35a6458`: added Android OAuth and Web OAuth build validation.
+- `edd82d0`: linked this persistent handoff from the repository README.
+
 ## Verified build results
 
 - TypeScript: PASS
@@ -81,4 +100,4 @@ This file is the handoff for future ChatGPT/Codex sessions. Continue from this s
 - Gradle wrapper: 8.14.3
 - Build tools: 35.0.0 and 36.0.0 are available.
 - Never publish or rotate the existing signing key during troubleshooting.
-
+- The refreshed Firebase file is used locally for the verified APK. Do not place credentials, keystores, or private service-account data in Git.
