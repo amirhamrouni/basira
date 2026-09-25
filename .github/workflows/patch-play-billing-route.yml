@@ -1,0 +1,34 @@
+name: Register Play Billing Route
+
+on:
+  push:
+    branches: [feat/play-billing]
+    paths:
+      - '.github/workflows/patch-play-billing-route.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/play-billing
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Register route
+        run: node scripts/register-play-billing-route.mjs
+      - name: Commit route registration
+        run: |
+          if git diff --quiet -- server.js; then
+            echo "server.js already registered"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js
+          git commit -m "Register Play Billing verification route"
+          git push origin HEAD:feat/play-billing
