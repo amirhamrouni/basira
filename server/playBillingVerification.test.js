@@ -1,5 +1,7 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  createGoogleAccessToken,
   inspectSubscriptionPurchase,
   sha256Hex,
   subscriptionTierForProduct,
@@ -38,9 +40,20 @@ describe('Google Play subscription verification helpers', () => {
     const result = inspectSubscriptionPurchase(data, 'basira_adept', {
       nowMs: NOW,
       expectedObfuscatedAccountId: 'account-b',
+      requireObfuscatedAccountId: true,
     });
     expect(result.entitled).toBe(false);
     expect(result.reason).toBe('ACCOUNT_MISMATCH');
+  });
+
+  it('rejects a new BASIRA purchase with no obfuscated account binding', () => {
+    const result = inspectSubscriptionPurchase(purchase('SUBSCRIPTION_STATE_ACTIVE'), 'basira_adept', {
+      nowMs: NOW,
+      expectedObfuscatedAccountId: 'expected-account',
+      requireObfuscatedAccountId: true,
+    });
+    expect(result.entitled).toBe(false);
+    expect(result.reason).toBe('ACCOUNT_ID_MISSING');
   });
 
   it('maps only configured product IDs to premium tiers', () => {
@@ -56,5 +69,26 @@ describe('Google Play subscription verification helpers', () => {
   it('hashes purchase tokens deterministically before persistence', () => {
     expect(sha256Hex('token-123')).toBe(sha256Hex('token-123'));
     expect(sha256Hex('token-123')).not.toBe(sha256Hex('token-456'));
+  });
+
+  it('uses the OAuth service-account JWT bearer grant exactly', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const serviceAccount = {
+      client_email: 'billing@example.iam.gserviceaccount.com',
+      project_id: 'example-project',
+      private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    };
+    let grantType = '';
+    const fakeFetch = async (_url, options) => {
+      const body = options.body;
+      grantType = body.get('grant_type');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'access-token' }),
+      };
+    };
+    await expect(createGoogleAccessToken(serviceAccount, fakeFetch)).resolves.toBe('access-token');
+    expect(grantType).toBe('urn:ietf:params:oauth:grant-type:jwt-bearer');
   });
 });
