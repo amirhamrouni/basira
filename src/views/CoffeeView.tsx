@@ -4,11 +4,10 @@ import { motion } from 'framer-motion';
 import { Coffee, CheckCircle2, Share2, Save } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../firebase';
-import { doc, updateDoc, increment } from 'firebase/firestore';
 import { getApiUrl } from '../utils/api';
 import { Capacitor } from '@capacitor/core';
 import { pickNativeReadingImage } from '../utils/readingImagePicker';
-import { remainingFreeReadings, saveMeteredReading } from '../utils/freeReadings';
+import { hasUnlimitedReadings, remainingFreeReadings, saveMeteredReading } from '../utils/freeReadings';
 import { compressReadingImage } from '../utils/imageCompression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import BasiraReadingText from '../components/BasiraReadingText';
@@ -20,6 +19,10 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
     const fileRef = useRef<HTMLInputElement>(null);
     const { user, profile, login } = useAuth();
     const [showRewardModal, setShowRewardModal] = React.useState(false);
+    const [rewardedUnlock, setRewardedUnlock] = React.useState(false);
+    const isPremium = hasUnlimitedReadings(profile);
+    const freeLeft = remainingFreeReadings(profile, 'coffee');
+
     const pickPhoto = async (source: 'camera' | 'gallery') => {
         try {
             const image = await pickNativeReadingImage('coffee', source);
@@ -47,7 +50,11 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
     const triggerScan = async () => {
         if (!imagePreview) return;
         if (!user || !profile) { login(); return; }
-        if (remainingFreeReadings(profile, 'coffee') === 0 && profile.energy < 15) { setShowRewardModal(true); return; }
+
+        const needsRewardedUnlock = !isPremium && freeLeft === 0;
+        if (needsRewardedUnlock && !rewardedUnlock) { setShowRewardModal(true); return; }
+        const useRewardedUnlock = needsRewardedUnlock && rewardedUnlock;
+
         setState((current: any) => ({ ...current, isScanning: true, reading: null, error: null }));
 
         try {
@@ -86,17 +93,25 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
 
             const generatedReading = typeof data.reply === 'string' ? data.reply.trim() : '';
             if (!generatedReading) throw new Error('Empty coffee reading');
-            await saveMeteredReading(db, user.uid, 'coffee', generatedReading);
+            await saveMeteredReading(db, user.uid, 'coffee', generatedReading, { rewardedUnlock: useRewardedUnlock });
+            if (useRewardedUnlock) setRewardedUnlock(false);
             setState((current: any) => ({ ...current, reading: generatedReading, error: null, isScanning: false }));
             rememberReading(user.uid, 'coffee', generatedReading);
         } catch (err) {
             console.error('Coffee reading failed', err);
-            const message = lang === 'ar' ? 'تعذّر تحليل الفنجان الآن. لم تُحفظ قراءة؛ تحقق من الاتصال ثم أعد المحاولة.' : 'The cup could not be analyzed. Nothing was saved; please retry.';
+            const message = lang === 'ar' ? 'تعذّر تحليل الفنجان الآن. لم تُحفظ قراءة ولم تُستهلك فتحة الإعلان؛ حاول بنفس الصورة مجدداً.' : 'The cup could not be analyzed. Nothing was saved and the ad unlock was not consumed; please retry.';
             setState((current: any) => ({ ...current, reading: null, error: message, isScanning: false }));
         }
     };
 
     const handleShare = () => shareReading(lang === 'ar' ? 'قراءتي من بصيرة' : 'My Basira Reading', reading);
+    const accessLabel = isPremium
+        ? (lang === 'ar' ? 'اشتراك مفتوح' : 'Premium')
+        : freeLeft > 0
+            ? (lang === 'ar' ? `باقي ${freeLeft} قراءات مجانية من 3` : `${freeLeft} of 3 free readings left`)
+            : rewardedUnlock
+                ? (lang === 'ar' ? 'القراءة مفتوحة بالإعلان' : 'Ad unlock ready')
+                : (lang === 'ar' ? 'القراءة التالية: إعلان أو اشتراك' : 'Next reading: ad or subscription');
 
     return (
         <motion.div initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-6 w-full pb-10">
@@ -129,7 +144,7 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
             </div>
 
             {Capacitor.isNativePlatform() && <div className="mx-4 flex gap-3"><button type="button" onClick={() => void pickPhoto('gallery')} className="flex-1 rounded-2xl border border-stella-gold/30 py-3 text-stella-gold font-bold">{lang === 'ar' ? 'اختيار صورة' : 'Choose photo'}</button><button type="button" onClick={() => void pickPhoto('camera')} className="flex-1 rounded-2xl border border-stella-gold/30 py-3 text-stella-gold font-bold">{lang === 'ar' ? 'تصوير الفنجان' : 'Take photo'}</button></div>}
-            <p className="mx-4 text-center text-xs text-stella-gold">{remainingFreeReadings(profile, 'coffee') > 0 ? (lang === 'ar' ? `باقي ${remainingFreeReadings(profile, 'coffee')} قراءات مجانية من 3` : `${remainingFreeReadings(profile, 'coffee')} of 3 free readings left`) : (lang === 'ar' ? 'القراءة التالية: 15 طاقة' : 'Next reading: 15 Energy')}</p>
+            <p className="mx-4 text-center text-xs text-stella-gold">{accessLabel}</p>
 
             {reading && (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-5 border border-gray-100 shadow-sm rounded-3xl mx-4">
@@ -145,7 +160,15 @@ export default function CoffeeView({ t, lang, state, setState, basiraContext }: 
                     </div>
                 </motion.div>
             )}
-            <CosmicRewardModal isOpen={showRewardModal} onClose={() => setShowRewardModal(false)} onRewardComplete={async () => { if (user) await updateDoc(doc(db, 'users', user.uid), { energy: increment(15) }); setShowRewardModal(false); }} lang={lang} rewardType="insight" title={lang === 'ar' ? 'نفدت طاقتك الكونية' : 'Cosmic Energy Depleted'} description={lang === 'ar' ? 'تحتاج إلى 15 طاقة. أكمل خطوة الاستعادة للمتابعة.' : 'You need 15 Energy. Complete the recovery step to continue.'} />
+            <CosmicRewardModal
+                isOpen={showRewardModal}
+                onClose={() => setShowRewardModal(false)}
+                onRewardComplete={() => setRewardedUnlock(true)}
+                lang={lang}
+                rewardType="insight"
+                title={lang === 'ar' ? 'انتهت القراءات المجانية' : 'Free readings used'}
+                description={lang === 'ar' ? 'شاهد إعلاناً مكافِئاً لفتح قراءة فنجان واحدة، أو استخدم اشتراكاً مفتوحاً.' : 'Watch one rewarded ad to unlock one coffee reading, or use an active subscription.'}
+            />
         </motion.div>
     );
 }
