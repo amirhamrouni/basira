@@ -7,6 +7,11 @@ import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import crypto from 'crypto';
+import { cert, getApps as getAdminApps, initializeApp as initializeAdminApp } from 'firebase-admin/app';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import { GoogleAuth } from 'google-auth-library';
 
 dotenv.config();
 
@@ -24,6 +29,8 @@ const SUPPORTED_ZODIAC_SIGNS = new Set([
 const FALLBACK_AR = 'الأثير مزدحم بالترددات في هذه اللحظة، يرجى المحاولة بعد قليل لضمان دقة القراءة.';
 const FALLBACK_EN = 'The cosmic frequencies are busy right now. Please try again in a moment for an accurate reading.';
 const FALLBACK_FR = 'Les fréquences cosmiques sont saturées en ce moment. Réessayez dans un instant.';
+const ANDROID_PACKAGE_NAME = 'com.basira.spiritportal';
+const ORACLE_PRODUCT_ID = 'basira_oracle_monthly';
 
 const ZODIAC_MAP_AR = {
     aries: 'الحمل', taurus: 'الثور', gemini: 'الجوزاء', cancer: 'السرطان',
@@ -59,6 +66,44 @@ export function cleanText(value, maxLength = 4000) {
     return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
+export function hasActiveGoogleSubscription(subscription, now = Date.now()) {
+    const entitledStates = new Set([
+        'SUBSCRIPTION_STATE_ACTIVE',
+        'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+        'SUBSCRIPTION_STATE_CANCELED',
+    ]);
+    if (!entitledStates.has(subscription?.subscriptionState)) return false;
+    return Array.isArray(subscription?.lineItems) && subscription.lineItems.some(item =>
+        item?.productId === ORACLE_PRODUCT_ID && Date.parse(item?.expiryTime || '') > now
+    );
+}
+
+function readGoogleServiceAccount() {
+    const raw = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
+    if (!raw) return null;
+    try {
+        const decoded = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+        return JSON.parse(decoded);
+    } catch {
+        throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not valid JSON or base64 JSON');
+    }
+}
+
+function getPurchaseServices() {
+    const serviceAccount = readGoogleServiceAccount();
+    if (!serviceAccount) return null;
+    const adminApp = getAdminApps()[0] || initializeAdminApp({ credential: cert(serviceAccount) });
+    const googleAuth = new GoogleAuth({
+        credentials: serviceAccount,
+        scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+    });
+    return {
+        adminAuth: getAdminAuth(adminApp),
+        firestore: getAdminFirestore(adminApp, process.env.FIRESTORE_DATABASE_ID || 'ai-studio-6aad922f-e489-4552-a94a-9a140353fa50'),
+        googleAuth,
+    };
+}
+
 export function startWithStrongSignals(reply) {
     const marker = '[أقوى 3 إشارات]';
     const index = reply.indexOf(marker);
@@ -66,6 +111,8 @@ export function startWithStrongSignals(reply) {
     // before the reading. The observation belongs inside the signals section.
     return index > 0 && index < 500 ? reply.slice(index) : reply;
 }
+
+export const PALM_READING_GUARD = `Identify whether a human palm is visible before judging fine-line sharpness. Any genuine visible palm is a valid input, including a palm photographed in dim or uneven light. Reject with ERROR_NOT_A_PALM only when no human palm is visible or the image is unusable. Never reject a visible palm merely because fine lines are faint. Build the reading from whatever is genuinely visible: major lines, branches, intersections, contours, finger proportions and palm mounts. Use fewer signals when detail is limited and briefly name which fine detail could benefit from a clearer photo, while still completing the reading. Never invent a mark or interpret the absence of a mark.`;
 
 export function parseImageDataUrl(value) {
     if (typeof value !== 'string') return null;
@@ -262,6 +309,67 @@ async function startServer() {
     const openai = process.env.OPENAI_API_KEY
         ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
         : null;
+
+    // Google Play is authoritative: the client never grants itself VIP access.
+    app.post('/api/purchases/google/verify', async (req, res) => {
+        const services = getPurchaseServices();
+        if (!services) return res.status(503).json({ error: 'Google Play verification is not configured' });
+
+        const bearer = req.get('authorization') || '';
+        const idToken = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
+        const purchaseToken = cleanText(req.body?.purchaseToken, 4096);
+        const productId = cleanText(req.body?.productId, 100);
+        if (!idToken || !purchaseToken || productId !== ORACLE_PRODUCT_ID) {
+            return res.status(400).json({ error: 'Invalid purchase verification request' });
+        }
+
+        try {
+            const decoded = await services.adminAuth.verifyIdToken(idToken, true);
+            const client = await services.googleAuth.getClient();
+            const access = await client.getAccessToken();
+            if (!access.token) throw new Error('Google Play API access token unavailable');
+
+            const endpoint = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${ANDROID_PACKAGE_NAME}/purchases/subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}`;
+            const playResponse = await fetch(endpoint, {
+                headers: { Authorization: `Bearer ${access.token}` },
+            });
+            if (!playResponse.ok) {
+                console.warn(`[Billing] Google Play verification failed: ${playResponse.status}`);
+                return res.status(402).json({ error: 'Purchase was not verified by Google Play' });
+            }
+
+            const subscription = await playResponse.json();
+            const expectedAccountId = crypto.createHash('sha256').update(decoded.uid).digest('hex');
+            const linkedAccountId = subscription?.externalAccountIdentifiers?.obfuscatedExternalAccountId;
+            if (linkedAccountId && linkedAccountId !== expectedAccountId) {
+                return res.status(403).json({ error: 'Purchase belongs to another account' });
+            }
+            if (!hasActiveGoogleSubscription(subscription)) {
+                return res.status(402).json({ error: 'Subscription is not active' });
+            }
+
+            const expiryTime = subscription.lineItems
+                .filter(item => item?.productId === ORACLE_PRODUCT_ID)
+                .map(item => item.expiryTime)
+                .sort()
+                .at(-1);
+            await services.firestore.doc(`users/${decoded.uid}`).set({
+                vipStatus: 'oracle',
+                subscription: {
+                    provider: 'google_play',
+                    productId: ORACLE_PRODUCT_ID,
+                    state: subscription.subscriptionState,
+                    expiryTime,
+                    verifiedAt: new Date(),
+                },
+            }, { merge: true });
+
+            return res.json({ active: true, tier: 'oracle', expiryTime });
+        } catch (error) {
+            console.error('[Billing] Verification error:', error?.message || error);
+            return res.status(401).json({ error: 'Purchase verification failed' });
+        }
+    });
 
     function toOpenAIInput(contents) {
         if (typeof contents === 'string') return contents;
@@ -576,7 +684,7 @@ Additional coffee rules:
             const response = await generateWithRetry(() =>
                 generateContent({
                     contents: [
-                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\nIdentify whether a human palm is visible before judging line sharpness. Reject with ERROR_NOT_A_PALM only if no human palm is visible. If a real palm is visible but no line, intersection or distinct contour can genuinely be distinguished, reply EXACTLY ERROR_PALM_LINES_UNREADABLE. Never call missing or unclear lines a signal. Describe only marks actually visible BEFORE their traditional interpretation. Connect the strongest visible mark, its location and a second mark when visible into one conditional scenario. If fewer than three marks are visible, provide only the real marks; never use absence as a sign or forecast love, work or money from it.' },
+                        { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nPALM READING TASK:\n' + (context || '') + '\n\n' + (prompt || '') + '\n' + PALM_READING_GUARD },
                         { inlineData: image }
                     ],
                     config: { temperature: 0.45, maxOutputTokens: 1050 }
@@ -586,7 +694,22 @@ Additional coffee rules:
             const reply = response.text?.trim();
             if (!reply) throw new Error('Empty response');
             if (reply === 'ERROR_NOT_A_PALM' || reply.startsWith('ERROR_NOT_A_PALM')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE' });
-            if (reply.startsWith('ERROR_PALM_LINES_UNREADABLE')) return res.status(422).json({ error: 'WRONG_IMAGE_TYPE', reply: lang === 'ar' ? 'راحة اليد ظاهرة، لكن الخطوط ما تتقراش في الصورة. صوّرها بإضاءة أمامية أوضح.' : 'Your palm is visible, but its lines are not readable. Take another photo in brighter front light.' });
+            // Backward compatibility for a model that still emits the removed
+            // unreadable-lines sentinel: retry as a valid, limited reading.
+            if (reply.startsWith('ERROR_PALM_LINES_UNREADABLE')) {
+                const retry = await generateWithRetry(() =>
+                    generateContent({
+                        contents: [
+                            { text: basiraVoice(lang, safeReadingContext(req.body?.basiraContext, lang), safeReadingMemory(req.body?.recentReadings)) + '\n\nThe image contains a valid human palm. Complete a limited reading using only visible contours, proportions, mounts or major lines. Do not reject it and do not invent fine marks.\n\n' + (context || '') + '\n\n' + (prompt || '') },
+                            { inlineData: image }
+                        ],
+                        config: { temperature: 0.45, maxOutputTokens: 1050 }
+                    })
+                );
+                const retryReply = retry.text?.trim();
+                if (!retryReply || retryReply.startsWith('ERROR_')) throw new Error('Palm retry returned no reading');
+                return res.json({ reply: startWithStrongSignals(retryReply) });
+            }
             return res.json({ reply: startWithStrongSignals(reply) });
         } catch (e) {
             console.error('[Palmistry API] Error:', e.message);

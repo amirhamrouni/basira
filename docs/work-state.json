@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-09-25T05:22:00+02:00",
+  "updated_at": "2026-09-25T15:05:00+02:00",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "branch": "feat/basira-context-engine",
@@ -38,6 +38,24 @@
     "dismiss_failure_timeout_handled": true,
     "device_test": "pending"
   },
+  "google_play_billing": {
+    "plugin": "@capgo/native-purchases@8.8.1",
+    "product_id": "basira_oracle_monthly",
+    "base_plan_id": "monthly",
+    "intended_price_eur_monthly": 4.99,
+    "local_beta_grant_removed": true,
+    "store_price_loading": true,
+    "purchase_flow": true,
+    "restore_flow": true,
+    "server_verification": true,
+    "firebase_auth_required": true,
+    "account_binding_checked": true,
+    "play_console_developer_id": "7101587915626451499",
+    "play_console_app_id": "4976344417830805219",
+    "merchant_profile": "missing",
+    "production_service_account_secret": "pending",
+    "device_test": "pending"
+  },
   "palmistry": {
     "visible_palm_always_valid": true,
     "unreadable_lines_rejection_removed": true,
@@ -49,12 +67,12 @@
   },
   "verification": {
     "typescript": "pass",
-    "tests": "15/15 pass",
+    "tests": "16/16 pass",
     "vite_build": "pass",
     "capacitor_sync": "pass",
     "android_auth_gate": "pass",
-    "gradle_debug_build": "pass",
-    "apk_signature": "pass"
+    "gradle_debug_build": "previous build pass; current billing build blocked by missing Java 21 and Gradle distribution in session",
+    "apk_signature": "previous APK pass; billing APK pending"
   },
   "latest_apk": {
     "filename": "BASIRA-palm-hotfix.apk",
@@ -67,6 +85,9 @@
     "Complete Google sign-in on a physical Android device",
     "Record the device result in this file",
     "Test rewarded ad after three free readings",
-    "Complete subscription verification and Play Console release work"
+    "Create the Google Payments merchant profile after explicit confirmation",
+    "Create basira_oracle_monthly / monthly at EUR 4.99",
+    "Configure GOOGLE_PLAY_SERVICE_ACCOUNT_JSON on production",
+    "Build the billing APK with Java 21 and test purchase/restore from Google Play internal testing"
   ]
 }

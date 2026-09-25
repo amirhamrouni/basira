@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Eye, Zap, Crown, Flame, Gem, ArrowRight, Play, ShieldCheck } from 'lucide-react';
 import { cn } from '../utils/cn';
@@ -7,12 +7,18 @@ import { useAuth } from '../components/AuthProvider';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db, analytics, remoteConfig, getValue } from '../firebase';
 import { logEvent } from 'firebase/analytics';
+import {
+    isNativeGooglePlayBilling,
+    loadOracleProduct,
+    purchaseOracle,
+    restoreOracle,
+} from '../services/googlePlayBilling';
 
 const tiers = [
     {
         id: 'adept',
         name: { en: 'The Adept', ar: 'المتخصص' },
-        price: { en: 'Free beta', ar: 'تجربة مجانية' },
+        price: { en: 'Free', ar: 'مجاني' },
         features: {
             en: ['Ad-free experience', 'Unlimited basic readings', 'Monthly 50 Stardust'],
             ar: ['تجربة بدون إعلانات', 'قراءات أساسية لا محدودة', '50 غبار نجمي شهرياً']
@@ -24,7 +30,7 @@ const tiers = [
     {
         id: 'oracle',
         name: { en: 'The Oracle', ar: 'العراف' },
-        price: { en: 'Free beta', ar: 'تجربة مجانية' },
+        price: { en: '€4.99 / month', ar: '€4.99 شهرياً' },
         features: {
             en: ['Everything in Adept', 'Deep psychological analysis', 'Unlimited Cosmic Energy', 'Priority AI processing'],
             ar: ['كل ميزات المتخصص', 'تحليل نفسي عميق', 'طاقة كونية لا محدودة', 'أولوية في معالجة الذكاء الاصطناعي']
@@ -41,6 +47,8 @@ export default function PremiumView({ lang }: any) {
     const [selectedTier, setSelectedTier] = useState('oracle');
     const [showAdModal, setShowAdModal] = useState(false);
     const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
+    const [storePrice, setStorePrice] = useState<string | null>(null);
+    const [purchaseBusy, setPurchaseBusy] = useState(false);
     const { user, profile, login } = useAuth();
     
     const xp = profile?.xp || 0;
@@ -49,24 +57,51 @@ export default function PremiumView({ lang }: any) {
     
     const rewardAmount = remoteConfig ? getValue(remoteConfig, 'ad_reward_energy').asNumber() : 10;
 
-    const handleCheckout = () => {
+    useEffect(() => {
+        if (!isNativeGooglePlayBilling()) return;
+        loadOracleProduct()
+            .then(product => product && setStorePrice(product.priceString))
+            .catch(error => console.warn('Google Play product unavailable:', error));
+    }, []);
+
+    const purchaseErrorMessage = (error: unknown) => {
+        const message = error instanceof Error ? error.message : '';
+        if (message.includes('NO_PURCHASE_FOUND')) return isAr ? 'لم نجد اشتراكاً سابقاً لهذا الحساب.' : 'No previous subscription was found for this account.';
+        if (message.includes('ANDROID_PLAY_REQUIRED')) return isAr ? 'الاشتراك متاح داخل تطبيق Android عبر Google Play.' : 'Subscribe in the Android app through Google Play.';
+        if (message.toLowerCase().includes('cancel')) return isAr ? 'تم إلغاء العملية ولم يحدث أي خصم.' : 'The purchase was cancelled. No charge was made.';
+        return isAr ? 'تعذر تأكيد الاشتراك الآن. لم يتم منح VIP دون تحقق Google Play.' : 'The subscription could not be verified. VIP was not granted without Google Play verification.';
+    };
+
+    const handleCheckout = async () => {
         if (!user) {
             login();
             return;
         }
-        const checkoutUrl = import.meta.env.VITE_CHECKOUT_URL as string | undefined;
-        if (!checkoutUrl) {
-            const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
-            localStorage.setItem('basira_beta_trial', JSON.stringify({ tier: selectedTier, expiresAt }));
-            setCheckoutMessage(isAr
-                ? 'تم تفعيل تجربة Oracle المجانية لمدة 7 أيام. لا توجد عملية دفع أو خصم.'
-                : 'Your free 7-day Oracle beta is active. No payment was made.');
-            return;
+        if (selectedTier !== 'oracle') return;
+        setPurchaseBusy(true);
+        setCheckoutMessage(null);
+        try {
+            await purchaseOracle(user);
+            setCheckoutMessage(isAr ? 'تم تأكيد اشتراك Oracle عبر Google Play.' : 'Your Oracle subscription was verified by Google Play.');
+        } catch (error) {
+            setCheckoutMessage(purchaseErrorMessage(error));
+        } finally {
+            setPurchaseBusy(false);
         }
-        const url = new URL(checkoutUrl);
-        url.searchParams.set('plan', selectedTier);
-        url.searchParams.set('uid', user.uid);
-        window.location.assign(url.toString());
+    };
+
+    const handleRestore = async () => {
+        if (!user) return login();
+        setPurchaseBusy(true);
+        setCheckoutMessage(null);
+        try {
+            await restoreOracle(user);
+            setCheckoutMessage(isAr ? 'تم استرجاع اشتراك Oracle وتأكيده.' : 'Your Oracle subscription was restored and verified.');
+        } catch (error) {
+            setCheckoutMessage(purchaseErrorMessage(error));
+        } finally {
+            setPurchaseBusy(false);
+        }
     };
     
     const handleRewardComplete = async () => {
@@ -222,7 +257,9 @@ export default function PremiumView({ lang }: any) {
                                     </div>
                                     <div>
                                         <h3 className="text-lg font-bold text-gray-800 font-amiri">{tier.name[lang as 'en' | 'ar']}</h3>
-                                        <span className={cn("text-xs font-bold", tier.iconColor)}>{tier.price[lang as 'en' | 'ar']}</span>
+                                        <span className={cn("text-xs font-bold", tier.iconColor)}>
+                                            {tier.id === 'oracle' && storePrice ? `${storePrice} ${isAr ? 'شهرياً' : '/ month'}` : tier.price[lang as 'en' | 'ar']}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className={cn(
@@ -243,27 +280,38 @@ export default function PremiumView({ lang }: any) {
                             </ul>
 
                             <AnimatePresence>
-                                {selectedTier === tier.id && (
+                                {selectedTier === tier.id && tier.id === 'oracle' && (
                                     <motion.button
                                         type="button"
                                         onClick={handleCheckout}
+                                        disabled={purchaseBusy}
                                         initial={{ opacity: 0, height: 0 }}
                                         animate={{ opacity: 1, height: 'auto' }}
                                         exit={{ opacity: 0, height: 0 }}
                                         className={cn(
-                                            "w-full py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-md border relative z-10",
+                                            "w-full py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-md border relative z-10 disabled:opacity-60 disabled:cursor-wait",
                                             tier.id === 'oracle' 
                                                 ? "bg-stella-gold/10 text-stella-gold border-stella-gold/30 hover:bg-stella-gold hover:text-white"
                                                 : "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white"
                                         )}
                                     >
-                                        {isAr ? 'ابدأ تجربة مجانية 7 أيام' : 'Start 7-day free beta'}
+                                        {purchaseBusy
+                                            ? (isAr ? 'جارٍ الاتصال بـ Google Play…' : 'Connecting to Google Play…')
+                                            : (isAr ? 'اشترك عبر Google Play' : 'Subscribe with Google Play')}
                                     </motion.button>
                                 )}
                             </AnimatePresence>
                         </div>
                     ))}
                 </div>
+                <button
+                    type="button"
+                    onClick={handleRestore}
+                    disabled={purchaseBusy}
+                    className="mt-4 w-full text-xs text-gray-500 underline underline-offset-4 disabled:opacity-50"
+                >
+                    {isAr ? 'استرجاع اشتراك سابق' : 'Restore previous subscription'}
+                </button>
             </div>
 
             {checkoutMessage && (

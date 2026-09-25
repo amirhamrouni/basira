@@ -1,6 +1,6 @@
 # BASIRA Current Work State
 
-Updated: 2026-09-25, Europe/Amsterdam
+Updated: 2026-09-25 15:05, Europe/Amsterdam
 
 ## Read this first
 
@@ -62,7 +62,15 @@ This file is the handoff for future ChatGPT/Codex sessions. Continue from this s
 - Merchant/public address requested by the user: `Maagdenburgstraat 2, 7421 ZB Deventer`.
 - Support email requested by the user: `hamrouniamir79@gmail.com`.
 - Saving the merchant profile was not verified; revisit Play Console and confirm the visible saved values.
-- Google Play Billing subscription and server-side purchase verification are still incomplete.
+- Google Play Billing client and server-side verification are implemented locally.
+- Product ID: `basira_oracle_monthly`; Android base plan ID: `monthly`; intended price: €4.99/month.
+- `@capgo/native-purchases` 8.8.1 is synced into Android and the billing permission is explicit.
+- The old local 7-day beta grant was removed. The client cannot grant `vipStatus`.
+- `/api/purchases/google/verify` verifies the Firebase ID token, Google Play subscription token, product, account binding, state, and expiry before the server writes `vipStatus: oracle`.
+- Restore-purchases and localized store-price loading are present.
+- Play Console login was verified on developer account `7101587915626451499`, app `4976344417830805219`.
+- Current Play Console blocker: no Google Payments merchant profile exists. Until it is created, subscriptions cannot be created in Play Console.
+- Production backend still needs secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (JSON or base64 JSON) for a service account authorized for both Firebase Admin and Android Publisher API.
 - Do not mark Stage 5/6 complete until a real rewarded ad and a real subscription test pass on device.
 
 ## Repair timeline
@@ -86,13 +94,25 @@ This file is the handoff for future ChatGPT/Codex sessions. Continue from this s
 - Gradle `assembleDebug`: PASS with Java 21
 - APK signature and certificate check: PASS
 
+## Billing implementation verification on 2026-09-25
+
+- TypeScript: PASS
+- Automated tests: 16/16 PASS, including active/expired/wrong-product subscription cases
+- Vite production build: PASS
+- Capacitor Android sync: PASS; native purchases plugin detected
+- Android auth prebuild gate after sync: PASS
+- New APK build: BLOCKED BY SESSION ENVIRONMENT, not by code. This session has Java 17 only, while BASIRA requires Java 21, and the Gradle 8.14.3 distribution is not cached; outbound download is blocked.
+
 ## Next action
 
 1. Install `BASIRA-google-auth-fixed-v2.apk` over the existing app.
 2. Tap Google sign-in.
 3. If it succeeds, record `google_sign_in_device: pass` in `docs/work-state.json`.
 4. If it fails, capture the new on-screen error. The build now exposes the actual error instead of the false SHA message.
-5. After login passes, test rewarded ads after the three free readings, then continue the subscription and Play Console release work.
+5. Create the Google Payments merchant profile in Play Console (requires explicit confirmation because it creates a financial profile).
+6. Create subscription `basira_oracle_monthly` with base plan `monthly` at €4.99/month.
+7. Configure the Android Publisher service account secret on the production backend.
+8. Build with Java 21, upload to internal testing, install from Google Play, and test purchase + restore on a physical device.
 
 ## Palm regression resolved on 2026-09-25
 
