@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { AdMob, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Play, X, Lock, Eye, Star, Compass } from 'lucide-react';
 
@@ -7,7 +9,7 @@ type RewardState = 'idle' | 'communing' | 'revealing' | 'rewarded';
 interface CosmicRewardProps {
     isOpen: boolean;
     onClose: () => void;
-    onRewardComplete: () => void;
+    onRewardComplete: () => void | Promise<void>;
     title: string;
     description: string;
     rewardType: 'insight' | 'vip' | 'destiny';
@@ -24,27 +26,77 @@ export default function CosmicRewardModal({
     lang = 'en'
 }: CosmicRewardProps) {
     const [state, setState] = useState<RewardState>('idle');
+    const [error, setError] = useState<string | null>(null);
+    const [claiming, setClaiming] = useState(false);
 
     useEffect(() => {
         if (!isOpen) {
             setState('idle');
+            setError(null);
+            setClaiming(false);
         }
     }, [isOpen]);
 
-    const handleOfferEnergy = () => {
+    const handleOfferEnergy = async () => {
+        if (state !== 'idle') return;
+        setError(null);
         setState('communing');
-        // Simulate ad watch time (e.g., 3 seconds for demo)
-        setTimeout(() => {
-            setState('revealing');
-            setTimeout(() => {
-                setState('rewarded');
-            }, 2500); // 2.5s for the cinematic reveal
-        }, 3000);
+        try {
+            if (!Capacitor.isNativePlatform()) {
+                throw new Error('Rewarded ads require the Android app.');
+            }
+            await AdMob.initialize();
+            const adId = 'ca-app-pub-1233451496176046/5417205489';
+            await AdMob.prepareRewardVideoAd({ adId });
+            let settled = false;
+            let timeoutId: ReturnType<typeof setTimeout> | undefined;
+            let handles: Array<{ remove: () => Promise<void> }> = [];
+            const eventResult = new Promise<void>(async (resolve, reject) => {
+                const finish = (callback: () => void) => {
+                    if (settled) return;
+                    settled = true;
+                    callback();
+                };
+                handles = await Promise.all([
+                    AdMob.addListener(RewardAdPluginEvents.Rewarded, () => finish(resolve)),
+                    AdMob.addListener(RewardAdPluginEvents.Dismissed, () => finish(() => reject(new Error('Rewarded ad dismissed before reward.')))),
+                    AdMob.addListener(RewardAdPluginEvents.FailedToShow, (nativeError) => finish(() => reject(new Error(nativeError?.message || 'Rewarded ad failed to show.')))),
+                ]);
+                timeoutId = setTimeout(() => finish(() => reject(new Error('Rewarded ad timed out.'))), 90000);
+            });
+            try {
+                await Promise.race([
+                    AdMob.showRewardVideoAd({ adId }),
+                    eventResult,
+                ]);
+                await eventResult;
+            } finally {
+                settled = true;
+                if (timeoutId) clearTimeout(timeoutId);
+                await Promise.all(handles.map((handle) => handle.remove()));
+            }
+            setState('rewarded');
+        } catch (cause) {
+            console.error('Rewarded ad failed', cause);
+            setError(lang === 'ar'
+                ? 'الإعلان غير متاح الآن أو لم يكتمل. لم تُضف طاقة؛ حاول لاحقاً.'
+                : 'The ad is unavailable or was not completed. No energy was added.');
+            setState('idle');
+        }
     };
 
-    const handleClaim = () => {
-        onRewardComplete();
-        onClose();
+    const handleClaim = async () => {
+        if (state !== 'rewarded' || claiming) return;
+        setClaiming(true);
+        try {
+            await onRewardComplete();
+            onClose();
+        } catch (cause) {
+            console.error('Reward delivery failed', cause);
+            setError(lang === 'ar' ? 'تعذّر إضافة المكافأة؛ حاول مرة أخرى.' : 'Could not deliver reward. Try again.');
+        } finally {
+            setClaiming(false);
+        }
     };
 
     const getIcon = () => {
@@ -146,6 +198,7 @@ export default function CosmicRewardModal({
                                         </div>
                                     </button>
                                     
+                                    {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
                                     <button onClick={onClose} className="text-[11px] text-gray-500 hover:text-gray-300 font-bold tracking-widest uppercase mt-2 transition-colors">
                                         {lang === 'ar' ? 'ربما لاحقاً' : 'Perhaps Later'}
                                     </button>
@@ -166,7 +219,7 @@ export default function CosmicRewardModal({
                                         {lang === 'ar' ? 'نتواصل مع الكون...' : 'Communing with the cosmos...'}
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                        {lang === 'ar' ? 'يتم سحب الطاقة (محاكاة إعلان)' : 'Drawing energy (Simulating Ad)'}
+                                        {lang === 'ar' ? 'يجري تحميل الإعلان...' : 'Loading rewarded ad...'}
                                     </p>
                                 </motion.div>
                             )}
@@ -205,11 +258,13 @@ export default function CosmicRewardModal({
                                     </div>
 
                                     <button 
-                                        onClick={handleClaim}
+                                        onClick={() => void handleClaim()}
+                                        disabled={claiming}
                                         className="w-full bg-stella-gold text-black px-6 py-4 rounded-2xl font-bold text-sm tracking-widest uppercase hover:brightness-110 transition-all shadow-[0_5px_20px_rgba(212,175,55,0.3)]"
                                     >
-                                        {lang === 'ar' ? 'استلم المعرفة' : 'Embrace Knowledge'}
+                                        {claiming ? (lang === 'ar' ? 'جارٍ إضافة المكافأة...' : 'Delivering reward...') : (lang === 'ar' ? 'استلم المعرفة' : 'Embrace Knowledge')}
                                     </button>
+                                    {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
                                 </motion.div>
                             )}
                         </div>

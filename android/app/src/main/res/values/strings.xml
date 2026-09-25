@@ -1,5 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <string name="admob_app_id">ca-app-pub-1233451496176046~9839666227</string>
     <string name="app_name">BASIRA</string>
     <string name="title_activity_main">BASIRA</string>
     <string name="package_name">com.basira.spiritportal</string>
