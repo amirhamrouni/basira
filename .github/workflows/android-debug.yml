@@ -2,6 +2,8 @@ name: BASIRA Android Debug APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: [feat/basira-context-engine]
   pull_request:
     branches: [main]
 
