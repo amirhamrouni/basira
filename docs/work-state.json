@@ -38,9 +38,18 @@
     "dismiss_failure_timeout_handled": true,
     "device_test": "pending"
   },
+  "palmistry": {
+    "visible_palm_always_valid": true,
+    "unreadable_lines_rejection_removed": true,
+    "limited_reading_retry": true,
+    "dark_preview_filter_removed": true,
+    "production_commit": "e0ede8b39fcb1ff633f3554fee3f5793e7bccbe0",
+    "production_health": "pass",
+    "regression_test": "pass"
+  },
   "verification": {
     "typescript": "pass",
-    "tests": "14/14 pass",
+    "tests": "15/15 pass",
     "vite_build": "pass",
     "capacitor_sync": "pass",
     "android_auth_gate": "pass",
@@ -48,8 +57,8 @@
     "apk_signature": "pass"
   },
   "latest_apk": {
-    "filename": "BASIRA-google-auth-fixed-v2.apk",
-    "sha256": "2f80cfb2ae8b22d3307804c85e9bf379634fc27f5c5560e0e71aa6e257fbddbe",
+    "filename": "BASIRA-palm-hotfix.apk",
+    "sha256": "1263163097af98a08740cdde27802b731cf24284f1eb65a62dc17a2a4f2e4532",
     "size_bytes": 10661767,
     "device_validation": "pending"
   },
