@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(FirebaseAuthenticationPlugin.class);
         registerPlugin(BasiraPhotoPicker.class);
+        registerPlugin(BasiraRewardedAds.class);
         super.onCreate(savedInstanceState);
     }
 }
