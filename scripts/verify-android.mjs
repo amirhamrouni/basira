@@ -7,6 +7,10 @@ const required = [
   ['capacitor.config.ts', "providers: ['google.com']"],
   ['capacitor.config.ts', 'skipNativeAuth: false'],
   ['android/app/src/main/java/com/basira/spiritportal/MainActivity.java', 'registerPlugin(BasiraPhotoPicker.class)'],
+  ['android/app/src/main/java/com/basira/spiritportal/MainActivity.java', 'registerPlugin(BasiraBilling.class)'],
+  ['android/app/src/main/java/com/basira/spiritportal/BasiraBilling.java', '@CapacitorPlugin(name = "BasiraBilling")'],
+  ['android/app/src/main/java/com/basira/spiritportal/BasiraBilling.java', 'Purchase.PurchaseState.PENDING'],
+  ['android/app/build.gradle', 'com.android.billingclient:billing:9.1.0'],
   ['android/app/src/main/AndroidManifest.xml', 'android:grantUriPermissions="true"'],
   ['android/app/capacitor.build.gradle', "implementation project(':capacitor-share')"],
 ];
@@ -20,7 +24,7 @@ for (const [file, needle] of required) {
   }
   const text = fs.readFileSync(file, 'utf8');
   if (!text.includes(needle)) {
-    console.error('FAIL native auth wiring:', file, 'missing', needle);
+    console.error('FAIL Android wiring:', file, 'missing', needle);
     failed = true;
   } else {
     console.log('PASS', file);
@@ -35,7 +39,7 @@ if (androidManifest.includes('<uses-permission android:name="android.permission.
 
 if (process.argv.includes('--structure-only')) {
   if (failed) process.exit(1);
-  console.log('ANDROID AUTH STRUCTURE GATE: PASS');
+  console.log('ANDROID STRUCTURE GATE: PASS');
   process.exit(0);
 }
 
@@ -80,4 +84,4 @@ if (!fs.existsSync(googleServices)) {
 }
 
 if (failed) process.exit(1);
-console.log('ANDROID AUTH PREBUILD GATE: PASS');
+console.log('ANDROID AUTH + BILLING PREBUILD GATE: PASS');
