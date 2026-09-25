@@ -14,14 +14,15 @@ These rules are mandatory for every future BASIRA change. They exist because reg
 ## Reading access and monetization
 
 - Palm and coffee readings have exactly 3 free readings per type for non-premium accounts.
-- After the free allowance, a non-premium reading costs 15 Energy.
+- After the free allowance, each palm/coffee reading requires one completed rewarded-ad unlock or an active premium entitlement. Existing Energy must not bypass this gate.
+- A rewarded-ad unlock opens exactly one successful palm/coffee reading. If analysis fails before the reading is saved, keep the unlock available for retry.
 - `vipStatus` values `adept` and `oracle` are server-controlled premium entitlements and must not spend Energy in `saveMeteredReading`.
 - Clients must never grant themselves `vipStatus`.
-- Rewarded-ad UI must never simulate ad completion with timers or animations. Grant an ad reward only after the native Google Mobile Ads rewarded callback confirms it was earned.
+- Rewarded-ad UI must never simulate ad completion with timers or animations. Grant an ad unlock only after the native Google Mobile Ads rewarded callback confirms it was earned.
 - Debug builds may use Google's official sample AdMob application ID and rewarded unit ID.
 - Release builds must fail if real `ADMOB_APP_ID` and `ADMOB_REWARDED_AD_UNIT_ID` values are missing.
 - UMP consent status must be refreshed before requesting ads. Do not bypass consent failures by assuming cached consent is valid unless `ConsentInformation.canRequestAds()` explicitly permits requests.
-- Before production monetization, harden Energy rewards with server-side rewarded-ad verification. A client callback alone is functional but not sufficient as an anti-fraud trust boundary.
+- Before production monetization, harden rewarded unlocks with server-side rewarded-ad verification. A client callback alone is functional but not sufficient as an anti-fraud trust boundary.
 
 ## Release discipline
 
