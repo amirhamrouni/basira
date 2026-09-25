@@ -11,6 +11,10 @@ import {
   subscriptionTierForProduct,
   verifyFirebaseIdentityToken,
 } from './playBillingVerification.js';
+import {
+  readStoredPurchaseForUser,
+  storePurchaseTokenSecret,
+} from './playBillingLifecycle.js';
 
 const PACKAGE_NAME = 'com.basira.spiritportal';
 
@@ -44,12 +48,83 @@ function publicError(error) {
   return { status: 502, code: 'PLAY_BILLING_VERIFICATION_FAILED' };
 }
 
+async function authenticatedContext(req, env, fetchImpl) {
+  const idToken = bearerToken(req.headers?.authorization);
+  if (!idToken) throw new Error('FIREBASE_ID_TOKEN_MISSING');
+  const serviceAccount = parseServiceAccount(env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON);
+  const firebaseApiKey = env.FIREBASE_WEB_API_KEY || env.VITE_FIREBASE_API_KEY;
+  const user = await verifyFirebaseIdentityToken(idToken, firebaseApiKey, fetchImpl);
+  const accessToken = await createGoogleAccessToken(serviceAccount, fetchImpl);
+  return {
+    user,
+    serviceAccount,
+    accessToken,
+    expectedObfuscatedAccountId: sha256Hex(user.uid),
+  };
+}
+
+function rejectInspection(res, inspection) {
+  if (inspection.reason === 'PRODUCT_MISMATCH') {
+    res.status(400).json({ error: 'PLAY_PRODUCT_MISMATCH' });
+    return true;
+  }
+  if (inspection.reason === 'ACCOUNT_MISMATCH' || inspection.reason === 'ACCOUNT_ID_MISSING') {
+    res.status(403).json({ error: inspection.reason });
+    return true;
+  }
+  return false;
+}
+
+async function persistAndAcknowledge({
+  serviceAccount,
+  accessToken,
+  uid,
+  purchaseToken,
+  productId,
+  tier,
+  inspection,
+  fetchImpl,
+  storeRawToken,
+}) {
+  const persisted = await persistSubscriptionDecision({
+    serviceAccount,
+    accessToken,
+    uid,
+    purchaseToken,
+    productId,
+    tier,
+    inspection,
+    fetchImpl,
+  });
+
+  if (storeRawToken) {
+    await storePurchaseTokenSecret({
+      serviceAccount,
+      accessToken,
+      tokenHash: persisted.tokenHash,
+      purchaseToken,
+      fetchImpl,
+    });
+  }
+
+  let acknowledged = !inspection.acknowledgementPending;
+  if (inspection.entitled && inspection.acknowledgementPending) {
+    await acknowledgeGooglePlaySubscription({
+      packageName: PACKAGE_NAME,
+      productId,
+      purchaseToken,
+      accessToken,
+      fetchImpl,
+    });
+    acknowledged = true;
+  }
+
+  return { persisted, acknowledged };
+}
+
 export function createPlayBillingVerifyHandler({ env = process.env, fetchImpl = fetch } = {}) {
   return async function verifyGooglePlaySubscription(req, res) {
     try {
-      const idToken = bearerToken(req.headers?.authorization);
-      if (!idToken) return res.status(401).json({ error: 'FIREBASE_ID_TOKEN_MISSING' });
-
       const purchaseToken = safeString(req.body?.purchaseToken, 4096);
       const productId = safeString(req.body?.productId, 256);
       if (!purchaseToken || !productId) {
@@ -59,74 +134,62 @@ export function createPlayBillingVerifyHandler({ env = process.env, fetchImpl = 
       const tier = subscriptionTierForProduct(productId, env);
       if (!tier) return res.status(400).json({ error: 'UNKNOWN_PLAY_PRODUCT' });
 
-      const serviceAccount = parseServiceAccount(env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON);
-      const firebaseApiKey = env.FIREBASE_WEB_API_KEY || env.VITE_FIREBASE_API_KEY;
-      const user = await verifyFirebaseIdentityToken(idToken, firebaseApiKey, fetchImpl);
-      const expectedObfuscatedAccountId = sha256Hex(user.uid);
-      const accessToken = await createGoogleAccessToken(serviceAccount, fetchImpl);
-
+      const context = await authenticatedContext(req, env, fetchImpl);
       const googlePurchase = await getGooglePlaySubscription({
         packageName: PACKAGE_NAME,
         purchaseToken,
-        accessToken,
+        accessToken: context.accessToken,
         fetchImpl,
       });
       const inspection = inspectSubscriptionPurchase(googlePurchase, productId, {
-        expectedObfuscatedAccountId,
+        expectedObfuscatedAccountId: context.expectedObfuscatedAccountId,
         requireObfuscatedAccountId: true,
       });
+      if (rejectInspection(res, inspection)) return;
 
-      if (inspection.reason === 'PRODUCT_MISMATCH') {
-        return res.status(400).json({ error: 'PLAY_PRODUCT_MISMATCH' });
-      }
-      if (inspection.reason === 'ACCOUNT_MISMATCH' || inspection.reason === 'ACCOUNT_ID_MISSING') {
-        return res.status(403).json({ error: inspection.reason });
-      }
-
+      let shouldPersist = false;
       if (inspection.entitled || inspection.state === 'SUBSCRIPTION_STATE_PENDING') {
         await claimPurchaseToken({
-          serviceAccount,
-          accessToken,
+          serviceAccount: context.serviceAccount,
+          accessToken: context.accessToken,
           purchaseToken,
-          uid: user.uid,
+          uid: context.user.uid,
           productId,
           fetchImpl,
         });
+        shouldPersist = true;
       } else {
-        const owner = await readPurchaseTokenOwner({ serviceAccount, accessToken, purchaseToken, fetchImpl });
+        const owner = await readPurchaseTokenOwner({
+          serviceAccount: context.serviceAccount,
+          accessToken: context.accessToken,
+          purchaseToken,
+          fetchImpl,
+        });
         if (!owner.existing) {
           return res.status(200).json({
             verified: true,
             entitled: false,
+            tier: 'none',
             state: inspection.state || inspection.reason,
             expiryTime: inspection.expiryTime || null,
+            acknowledged: !inspection.acknowledgementPending,
           });
         }
-        if (owner.uid !== user.uid) return res.status(403).json({ error: 'PURCHASE_TOKEN_ALREADY_BOUND' });
+        if (owner.uid !== context.user.uid) return res.status(403).json({ error: 'PURCHASE_TOKEN_ALREADY_BOUND' });
+        shouldPersist = true;
       }
 
-      const persisted = await persistSubscriptionDecision({
-        serviceAccount,
-        accessToken,
-        uid: user.uid,
+      const { persisted, acknowledged } = await persistAndAcknowledge({
+        serviceAccount: context.serviceAccount,
+        accessToken: context.accessToken,
+        uid: context.user.uid,
         purchaseToken,
         productId,
         tier,
         inspection,
         fetchImpl,
+        storeRawToken: shouldPersist,
       });
-
-      let acknowledged = !inspection.acknowledgementPending;
-      if (inspection.entitled && inspection.acknowledgementPending) {
-        await acknowledgeGooglePlaySubscription({
-          packageName: PACKAGE_NAME,
-          productId,
-          purchaseToken,
-          accessToken,
-          fetchImpl,
-        });
-        acknowledged = true;
-      }
 
       return res.status(200).json({
         verified: true,
@@ -145,6 +208,70 @@ export function createPlayBillingVerifyHandler({ env = process.env, fetchImpl = 
   };
 }
 
+export function createPlayBillingStatusHandler({ env = process.env, fetchImpl = fetch } = {}) {
+  return async function syncGooglePlaySubscription(req, res) {
+    try {
+      const context = await authenticatedContext(req, env, fetchImpl);
+      const stored = await readStoredPurchaseForUser({
+        serviceAccount: context.serviceAccount,
+        accessToken: context.accessToken,
+        uid: context.user.uid,
+        fetchImpl,
+      });
+      if (!stored) {
+        return res.status(200).json({
+          verified: true,
+          entitled: false,
+          tier: 'none',
+          state: 'NO_STORED_PLAY_SUBSCRIPTION',
+        });
+      }
+
+      const tier = subscriptionTierForProduct(stored.productId, env);
+      if (!tier) return res.status(503).json({ error: 'PLAY_BILLING_SERVER_NOT_CONFIGURED' });
+
+      const googlePurchase = await getGooglePlaySubscription({
+        packageName: PACKAGE_NAME,
+        purchaseToken: stored.purchaseToken,
+        accessToken: context.accessToken,
+        fetchImpl,
+      });
+      const inspection = inspectSubscriptionPurchase(googlePurchase, stored.productId, {
+        expectedObfuscatedAccountId: context.expectedObfuscatedAccountId,
+        requireObfuscatedAccountId: true,
+      });
+      if (rejectInspection(res, inspection)) return;
+
+      const { persisted, acknowledged } = await persistAndAcknowledge({
+        serviceAccount: context.serviceAccount,
+        accessToken: context.accessToken,
+        uid: context.user.uid,
+        purchaseToken: stored.purchaseToken,
+        productId: stored.productId,
+        tier,
+        inspection,
+        fetchImpl,
+        storeRawToken: false,
+      });
+
+      return res.status(200).json({
+        verified: true,
+        entitled: inspection.entitled,
+        tier: inspection.entitled ? tier : 'none',
+        state: inspection.state,
+        expiryTime: inspection.expiryTime || null,
+        acknowledged,
+        revokedCurrentEntitlement: Boolean(persisted.revokedCurrentEntitlement),
+      });
+    } catch (error) {
+      console.error('[Play Billing] status sync failed', error instanceof Error ? error.message : error);
+      const mapped = publicError(error);
+      return res.status(mapped.status).json({ error: mapped.code });
+    }
+  };
+}
+
 export function registerPlayBillingRoutes(app, options = {}) {
   app.post('/api/billing/google-play/verify', createPlayBillingVerifyHandler(options));
+  app.post('/api/billing/google-play/status', createPlayBillingStatusHandler(options));
 }
