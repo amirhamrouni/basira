@@ -1,13 +1,14 @@
 {
-  "schema_version": 5,
-  "updated_at": "2026-09-26T03:07:00+02:00",
+  "schema_version": 6,
+  "updated_at": "2026-09-26",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "canonical_branch": "main",
-  "last_verified_runtime_head": "fe17eaa06d2f741692610dcf8abcb3b40fb672a0",
+  "last_verified_runtime_head": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
   "billing_pr": 17,
   "billing_production_smoke_pr": 18,
   "activation_prep_pr": 19,
+  "release_pipeline_pr": 20,
   "android": {
     "application_id": "com.basira.spiritportal",
     "version_name": "1.0",
@@ -16,11 +17,17 @@
     "target_sdk": 36,
     "min_sdk": 24,
     "jdk": 21,
-    "signing_certificate": {
+    "known_good_signing_certificate": {
       "sha1": "D3:1F:0E:80:0F:45:20:5E:5B:BB:EE:DC:0A:70:12:A4:C6:A8:E6:E3",
       "sha256": "C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68"
     },
-    "github_actions_original_signing_secret": "missing"
+    "github_actions_debug_signing_secret": "missing",
+    "release_signing_secrets": {
+      "BASIRA_RELEASE_KEYSTORE_BASE64": "missing",
+      "BASIRA_RELEASE_KEYSTORE_PASSWORD": "missing",
+      "BASIRA_RELEASE_KEY_ALIAS": "missing",
+      "BASIRA_RELEASE_KEY_PASSWORD": "missing"
+    }
   },
   "firebase": {
     "project_id": "gen-lang-client-0217548336",
@@ -33,7 +40,14 @@
     "firestore_rules_hardened_in_source": true,
     "firestore_rules_deploy_workflow": "Deploy BASIRA Firestore Rules",
     "firestore_rules_deployed": false,
-    "github_rules_service_account_secret_required": "FIREBASE_SERVICE_ACCOUNT_JSON"
+    "firebase_service_account_secret": "missing",
+    "deploy_attempt": {
+      "run_id": 36207958916,
+      "job_id": 108308392804,
+      "target_validator": "pass",
+      "google_auth": "failed_missing_credentials_json",
+      "rules_published": false
+    }
   },
   "google_sign_in": {
     "credential_manager_primary": true,
@@ -61,7 +75,7 @@
     "billing_library": "9.1.0",
     "native_plugin": "BasiraBillingPlugin",
     "runtime_config_endpoint": "/api/billing/config",
-    "ids_hardcoded_in_apk": false,
+    "ids_hardcoded_in_apk_or_aab": false,
     "server_purchase_verification": true,
     "firebase_id_token_verification": true,
     "uid_purchase_binding": true,
@@ -85,10 +99,29 @@
     "device_purchase_test": "not_started",
     "device_restore_test": "not_started"
   },
+  "release_pipeline": {
+    "workflow": ".github/workflows/android-release.yml",
+    "merged": true,
+    "merge_commit": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
+    "r8_optional_facebook_fix": true,
+    "validated_head": "c4d9dd70b40494fd0f063017c3cb9eaea5bba7f1",
+    "workflow_run_id": 36208238873,
+    "job_id": 108309243578,
+    "bundle_release": "pass",
+    "r8_minify": "pass",
+    "resource_shrink": "pass",
+    "gradle_tasks": 255,
+    "aab_structure_verification": "pass",
+    "aab_size_bytes_approx": 7397487,
+    "aab_sha256": "c133ae89450d8438663d0f0d35ee3ee0e46f6a5a4746bf706716b3941b606256",
+    "signed": false,
+    "publishable": false,
+    "artifact_name": "basira-release-aab-candidate",
+    "artifact_id": 10894992323,
+    "artifact_zip_digest": "sha256:7cebe48ed02d8d80f673172d1966ad083ebe0708c9ec44666813a1264930f661",
+    "artifact_expires_at": "2026-10-03T01:26:57Z"
+  },
   "verification": {
-    "billing_code_head": "574a5b22251ca49c342ba4a39d557bcec0b57ee9",
-    "activation_prep_head": "e5a2dd00aea9ae7408572edc1ee3fe2c89cf1b54",
-    "final_runtime_head": "fe17eaa06d2f741692610dcf8abcb3b40fb672a0",
     "typescript": "pass",
     "tests": "24/24 pass",
     "test_files": 8,
@@ -96,15 +129,13 @@
     "firebase_named_database_validator": "pass",
     "production_server_runtime_smoke": "pass",
     "permanent_billing_production_smoke": "pass",
-    "post_pr19_deploy_production_smoke": "pass",
-    "production_billing_config_observed": "not configured",
+    "post_pr20_deploy_production_smoke": "pass",
     "capacitor_sync": "pass",
     "android_auth_gate": "pass",
-    "gradle_debug_build": "pass",
-    "android_pr19_build": "pass",
-    "android_pr19_apk_verification": "pass",
-    "github_ci_debug_apk_sha256_for_billing_head": "3b28dd68ee6810a88b999b58e0032775d98eedee60b0a6bf8a681435a70fc855",
-    "github_ci_debug_certificate_continuity": "not_verified_missing_original_signing_secret"
+    "android_debug_build": "pass",
+    "android_debug_apk_verification": "pass",
+    "release_aab_build": "pass_unsigned",
+    "release_signing_continuity": "blocked_missing_release_signing_secrets"
   },
   "production": {
     "primary_render_service": "basira-1",
@@ -112,8 +143,8 @@
     "secondary_render_service": "basira",
     "secondary_url": "https://basira-qx6d.onrender.com",
     "auto_deploy_branch": "main",
-    "runtime_head_live_on_primary": "fe17eaa06d2f741692610dcf8abcb3b40fb672a0",
-    "runtime_head_live_on_secondary": "fe17eaa06d2f741692610dcf8abcb3b40fb672a0",
+    "runtime_head_live_on_primary": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
+    "runtime_head_live_on_secondary": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
     "billing_safe_when_unconfigured": true
   },
   "latest_installable_known_good_apk": {
@@ -125,26 +156,23 @@
     "contains_new_play_billing": false
   },
   "external_activation_blockers": [
-    "Create or confirm the real Google Play subscription product in Play Console",
-    "Create or confirm and activate the real base plan, billing period, price and regional settings",
-    "Set PLAY_SUBSCRIPTION_PRODUCT_ID and PLAY_SUBSCRIPTION_BASE_PLAN_ID on intended Render production services",
-    "Configure GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher access",
-    "Configure FIREBASE_SERVICE_ACCOUNT_JSON with Firestore server-write / rules-deploy permissions",
-    "Deploy hardened firestore.rules to the named BASIRA Firestore database",
-    "Restore BASIRA_DEBUG_KEYSTORE_BASE64 for signing continuity",
-    "Run real purchase and restore tests from a Play-distributed build on a physical Android device"
+    "Authenticated Google Play Console or Android Publisher access to create/verify the real subscription product and base plan",
+    "FIREBASE_SERVICE_ACCOUNT_JSON for named Firestore rules deployment and/or server Firestore access",
+    "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher permission",
+    "Actual Play upload/release keystore and the four BASIRA_RELEASE_* GitHub secrets",
+    "Exact real PLAY_SUBSCRIPTION_PRODUCT_ID and PLAY_SUBSCRIPTION_BASE_PLAN_ID on production Render services",
+    "Play-distributed physical-device purchase/restore/cancellation/expiry tests"
   ],
   "next_steps": [
-    "Do not reimplement Billing, AdMob, Google sign-in, palm handling, or Firestore deploy targeting",
-    "Use ChatGPT Work / Cloud Browser to open BASIRA Play Console and create the real Subscription Product and Base Plan",
-    "Record exact immutable Product ID and Base Plan ID plus billing period and price",
-    "Configure Play API service-account permissions and secure backend credentials",
-    "Configure Render runtime IDs and credentials",
-    "Verify /api/billing/config reports configured true with exact real IDs",
-    "Deploy Firestore rules with the guarded workflow and record the result",
-    "Restore signing-key secret in GitHub Actions",
-    "Run physical-device sign-in, rewarded-ad, purchase, restore, cancellation and expiry tests",
-    "Produce the release AAB only after all device gates pass"
+    "Do not reimplement Billing, AdMob, Google sign-in, palm handling, Firestore targeting, or the release AAB pipeline",
+    "Use authenticated Play Console/Work browser to create or verify the subscription and base plan, then record exact IDs/price/period",
+    "Configure Google Play and Firebase service-account credentials securely",
+    "Set exact billing IDs and credentials on Render and verify /api/billing/config becomes configured true",
+    "Deploy Firestore rules successfully to the named BASIRA database",
+    "Inspect Play App Signing/upload-key state before restoring or creating signing credentials",
+    "Populate release signing secrets and rebuild a signed AAB",
+    "Run physical Play testing for sign-in, free readings, rewarded ads, purchase, restore, cancellation and expiry",
+    "Proceed to Play release checks only after all device gates pass"
   ],
   "activation_runbook": "docs/PLAY_ACTIVATION_RUNBOOK.md"
 }
