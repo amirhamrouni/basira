@@ -1,6 +1,10 @@
-const base = 'https://basira-1-2fwh.onrender.com';
+const primaryBase = 'https://basira-1-2fwh.onrender.com';
+const productionBases = [
+    primaryBase,
+    'https://basira-qx6d.onrender.com',
+];
 
-async function request(path, body) {
+async function request(base, path, body) {
     const response = await fetch(`${base}${path}`, {
         method: body ? 'POST' : 'GET',
         headers: body ? { 'content-type': 'application/json' } : {},
@@ -8,8 +12,46 @@ async function request(path, body) {
         signal: AbortSignal.timeout(120_000)
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(`${path} HTTP ${response.status}: ${JSON.stringify(data).slice(0, 200)}`);
+    if (!response.ok) throw new Error(`${base}${path} HTTP ${response.status}: ${JSON.stringify(data).slice(0, 200)}`);
     return data;
+}
+
+function verifyBillingConfig(config, base) {
+    for (const field of ['configured', 'catalogConfigured', 'serverVerificationReady']) {
+        if (typeof config?.[field] !== 'boolean') throw new Error(`${base}: Billing config missing ${field}`);
+    }
+    if (config.configured !== Boolean(config.catalogConfigured && config.serverVerificationReady)) {
+        throw new Error(`${base}: Billing configured flag disagrees with catalog/server readiness`);
+    }
+    if (config.catalogConfigured) {
+        if (typeof config.productId !== 'string' || !config.productId.trim()) throw new Error(`${base}: Billing catalog configured without productId`);
+        if (typeof config.basePlanId !== 'string' || !config.basePlanId.trim()) throw new Error(`${base}: Billing catalog configured without basePlanId`);
+    } else if (config.productId !== null || config.basePlanId !== null) {
+        throw new Error(`${base}: Billing must not expose partial IDs when catalog is unconfigured`);
+    }
+}
+
+async function verifyProductionBase(base) {
+    let health;
+    for (let attempt = 0; attempt < 10; attempt++) {
+        try {
+            health = await request(base, '/api/health');
+            if (health.status === 'ok' && health.aiReady) break;
+        } catch (error) {
+            console.log(`${base} health attempt ${attempt + 1}: ${error.message}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 8_000));
+    }
+    if (health?.status !== 'ok' || !health.aiReady) throw new Error(`${base}: production health or provider not ready`);
+    console.log(`${base} health:`, JSON.stringify(health));
+
+    const billingConfig = await request(base, '/api/billing/config');
+    verifyBillingConfig(billingConfig, base);
+    console.log(`${base} Billing: configured=${billingConfig.configured}, catalog=${billingConfig.catalogConfigured}, serverVerification=${billingConfig.serverVerificationReady}`);
+}
+
+for (const base of productionBases) {
+    await verifyProductionBase(base);
 }
 
 function verify(reply, kind) {
@@ -22,46 +64,23 @@ function verify(reply, kind) {
     console.log(`${kind} (${reply.length} chars):\n${reply}`);
 }
 
-let health;
-for (let attempt = 0; attempt < 10; attempt++) {
-    try {
-        health = await request('/api/health');
-        if (health.status === 'ok' && health.aiReady) break;
-    } catch (error) {
-        console.log(`Health attempt ${attempt + 1}: ${error.message}`);
-    }
-    await new Promise(resolve => setTimeout(resolve, 8_000));
-}
-if (health?.status !== 'ok' || !health.aiReady) throw new Error('Production health or provider not ready');
-console.log('Production health:', JSON.stringify(health));
-
-const billingConfig = await request('/api/billing/config');
-if (typeof billingConfig?.configured !== 'boolean') throw new Error('Billing config missing configured flag');
-if (billingConfig.configured) {
-    if (typeof billingConfig.productId !== 'string' || !billingConfig.productId.trim()) throw new Error('Billing configured without productId');
-    if (typeof billingConfig.basePlanId !== 'string' || !billingConfig.basePlanId.trim()) throw new Error('Billing configured without basePlanId');
-} else if (billingConfig.productId !== null || billingConfig.basePlanId !== null) {
-    throw new Error('Unconfigured Billing must not expose partial IDs');
-}
-console.log(`Production Billing config: ${billingConfig.configured ? 'configured' : 'not configured'}`);
-
 const cards = [
     { position: 'الماضي', name: 'Two of Wands', nameAr: 'اثنان العصي', theme: 'اختيار بين مسارين', reflection: 'القرار مُعلّق' },
     { position: 'الحاضر', name: 'Eight of Pentacles', nameAr: 'ثمانية العملات', theme: 'تدريب ومهارة', reflection: 'تحضير عرض عمل' },
     { position: 'القريب', name: 'The Chariot', nameAr: 'العربة', theme: 'حركة مشروطة بالحسم', reflection: 'تغيير مكان العمل بعد قرار' }
 ];
-const first = (await request('/api/tarot', { lang: 'ar', spreadName: 'ثلاث بطاقات', question: 'هل أقبل عرض العمل أم أنتظر؟', cards })).reply;
+const first = (await request(primaryBase, '/api/tarot', { lang: 'ar', spreadName: 'ثلاث بطاقات', question: 'هل أقبل عرض العمل أم أنتظر؟', cards })).reply;
 verify(first, 'TAROT');
 if (!cards.some(card => first.includes(card.nameAr) || first.includes(card.name))) throw new Error('Tarot lacks actual card names');
 
 const followUp = 'العرض الثاني فيه تدريب لكن يلزمني نقل مدينة خلال أسبوعين؛ نحب نعرف شنوة يبدّل في السيناريو.';
-const second = (await request('/api/chat', { lang: 'ar', followUp, previousReading: first, context: 'متابعة قراءة التاروت المتعلقة بقبول عرض عمل', basiraContext: { preferredName: 'سليم' } })).reply;
+const second = (await request(primaryBase, '/api/chat', { lang: 'ar', followUp, previousReading: first, context: 'متابعة قراءة التاروت المتعلقة بقبول عرض عمل', basiraContext: { preferredName: 'سليم' } })).reply;
 console.log(`FOLLOW-UP (${second?.length} chars):\n${second}`);
 if (!second || second.length < 130 || second === first) throw new Error('Follow-up missing or identical');
 if (!/تدريب|نقل|مدين|أسبوع|عرض/.test(second)) throw new Error('Follow-up did not incorporate new answer');
 
 const memory = [{ type: 'tarot', signals: first.match(/\[أقوى 3 إشارات\]([^[]*)/)?.[1]?.slice(0, 700), direction: first.match(/\[ما يقترب\]([^[]*)/)?.[1]?.slice(0, 160) }];
-const third = (await request('/api/tarot', { lang: 'ar', spreadName: 'ثلاث بطاقات', question: 'بعد التدريب، أين أركز جهدي الآن؟', cards, recentReadings: memory })).reply;
+const third = (await request(primaryBase, '/api/tarot', { lang: 'ar', spreadName: 'ثلاث بطاقات', question: 'بعد التدريب، أين أركز جهدي الآن؟', cards, recentReadings: memory })).reply;
 verify(third, 'MEMORY READING');
 if (third === first) throw new Error('Reading repeated verbatim despite memory');
 const signalLines = text => text.split('\n').filter(line => /^\s*[1-3][.،)]/.test(line));

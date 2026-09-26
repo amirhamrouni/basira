@@ -19,12 +19,6 @@ function decodeJwtPart(part) {
     return JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
 }
 
-function playBillingConfig() {
-    const productId = (process.env.PLAY_SUBSCRIPTION_PRODUCT_ID || '').trim();
-    const basePlanId = (process.env.PLAY_SUBSCRIPTION_BASE_PLAN_ID || '').trim();
-    return { productId, basePlanId, configured: Boolean(productId && basePlanId) };
-}
-
 function parseServiceAccount(value, name) {
     if (!value) throw new Error(`${name}_MISSING`);
     let text = value.trim();
@@ -35,6 +29,35 @@ function parseServiceAccount(value, name) {
     try { parsed = JSON.parse(text); } catch { throw new Error(`${name}_INVALID_JSON`); }
     if (!parsed.client_email || !parsed.private_key) throw new Error(`${name}_INVALID`);
     return parsed;
+}
+
+function hasUsableServiceAccount(value) {
+    try {
+        const parsed = parseServiceAccount(value || '', 'SERVICE_ACCOUNT');
+        if (!String(parsed.client_email).includes('@')) return false;
+        crypto.createPrivateKey(parsed.private_key);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export function playBillingReadiness(env = process.env) {
+    const productId = (env.PLAY_SUBSCRIPTION_PRODUCT_ID || '').trim();
+    const basePlanId = (env.PLAY_SUBSCRIPTION_BASE_PLAN_ID || '').trim();
+    const catalogConfigured = Boolean(productId && basePlanId);
+    const playCredentialsConfigured = hasUsableServiceAccount(env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || '');
+    const firestoreCredentialsConfigured = hasUsableServiceAccount(
+        env.FIREBASE_SERVICE_ACCOUNT_JSON || env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || ''
+    );
+    const serverVerificationReady = playCredentialsConfigured && firestoreCredentialsConfigured;
+    return {
+        configured: catalogConfigured && serverVerificationReady,
+        catalogConfigured,
+        serverVerificationReady,
+        productId,
+        basePlanId,
+    };
 }
 
 async function getGoogleAccessToken(serviceAccount, scope) {
@@ -199,11 +222,13 @@ function bearerToken(req) {
 
 export function installBillingRoutes(app) {
     app.get('/api/billing/config', (req, res) => {
-        const { productId, basePlanId, configured } = playBillingConfig();
+        const readiness = playBillingReadiness();
         return res.json({
-            configured,
-            productId: configured ? productId : null,
-            basePlanId: configured ? basePlanId : null,
+            configured: readiness.configured,
+            catalogConfigured: readiness.catalogConfigured,
+            serverVerificationReady: readiness.serverVerificationReady,
+            productId: readiness.catalogConfigured ? readiness.productId : null,
+            basePlanId: readiness.catalogConfigured ? readiness.basePlanId : null,
         });
     });
 
@@ -215,8 +240,9 @@ export function installBillingRoutes(app) {
             const purchaseToken = typeof req.body?.purchaseToken === 'string' ? req.body.purchaseToken.trim() : '';
             if (!purchaseToken || purchaseToken.length > 4096) return res.status(400).json({ error: 'INVALID_PURCHASE_TOKEN' });
 
-            const { productId, basePlanId, configured } = playBillingConfig();
-            if (!configured) return res.status(503).json({ error: 'PLAY_SUBSCRIPTION_NOT_CONFIGURED' });
+            const readiness = playBillingReadiness();
+            if (!readiness.configured) return res.status(503).json({ error: 'PLAY_SUBSCRIPTION_NOT_READY' });
+            const { productId, basePlanId } = readiness;
 
             const playServiceAccount = parseServiceAccount(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || '', 'GOOGLE_PLAY_SERVICE_ACCOUNT_JSON');
             const firestoreServiceAccount = parseServiceAccount(
