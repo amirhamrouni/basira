@@ -9,7 +9,7 @@ Treat them as the current handoff and update both after every verified milestone
 - Keep user updates silent or very short while work is running. Report only a result, a real blocker, or a required user device test.
 - Never claim a device-only behavior works until it is tested on a physical Android device.
 - Preserve the Android package name `com.basira.spiritportal`.
-- Never commit passwords, keystores, service-account files, tokens, or private keys.
+- Never commit passwords, keystores, service-account files, tokens, purchase tokens, or private keys.
 - Do not replace a working Firebase configuration with an older downloaded copy.
 
 ## Required Android build order
@@ -42,3 +42,14 @@ Treat them as the current handoff and update both after every verified milestone
 - Grant it only from the rewarded callback.
 - Handle reward, dismiss, failure, and timeout paths so the UI cannot hang.
 
+## Google Play Billing invariants
+
+- Never grant Premium from the Android client alone. A purchase must be verified server-side against Google Play before `vipStatus` changes.
+- Bind purchases to the signed-in Firebase account with `obfuscatedAccountId`; reject a purchase whose Play account identifier does not match the Firebase UID hash.
+- Product ID and Base Plan ID come from server runtime configuration at `/api/billing/config`; never invent them and never hard-code placeholder Play IDs into the APK.
+- The server is authoritative for `vipStatus`, `premiumUntil`, `premiumProductId`, `premiumBasePlanId`, `premiumState`, and `premiumVerifiedAt`. Firestore clients must not be allowed to modify those fields.
+- Do not store raw Google Play purchase tokens in Firestore or logs. Store only a one-way fingerprint when an audit identifier is needed.
+- Active, grace-period, and canceled-but-not-yet-expired subscriptions may remain entitled. Pending, paused, on-hold, and expired subscriptions must not grant Premium.
+- A server-written `premiumUntil` timestamp must be enforced locally as a fail-closed expiry guard even if a stale `vipStatus` remains cached.
+- The local 7-day free-beta fallback is retired. Do not restore it as a substitute for real Billing.
+- Real Play Billing is not considered live until a real Console Product/Base Plan exists, server credentials are configured, Firestore rules are deployed, and purchase + restore pass on a physical Android device.
