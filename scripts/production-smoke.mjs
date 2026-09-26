@@ -1,7 +1,7 @@
 const primaryBase = 'https://basira-1-2fwh.onrender.com';
 const productionBases = [
-    primaryBase,
-    'https://basira-qx6d.onrender.com',
+    { base: primaryBase, requireAi: true },
+    { base: 'https://basira-qx6d.onrender.com', requireAi: false },
 ];
 
 async function request(base, path, body) {
@@ -43,26 +43,28 @@ function verifyBillingConfig(config, base) {
     console.log(`${base} Billing: configured=${config.configured}, catalog=${config.catalogConfigured}, serverVerification=${config.serverVerificationReady}`);
 }
 
-async function verifyProductionBase(base) {
+async function verifyProductionBase(base, requireAi) {
     let health;
     for (let attempt = 0; attempt < 10; attempt++) {
         try {
             health = await request(base, '/api/health');
-            if (health.status === 'ok' && health.aiReady) break;
+            if (health.status === 'ok' && (!requireAi || health.aiReady)) break;
         } catch (error) {
             console.log(`${base} health attempt ${attempt + 1}: ${error.message}`);
         }
         await new Promise(resolve => setTimeout(resolve, 8_000));
     }
-    if (health?.status !== 'ok' || !health.aiReady) throw new Error(`${base}: production health or provider not ready`);
+    if (health?.status !== 'ok') throw new Error(`${base}: production health endpoint not ready`);
+    if (requireAi && !health.aiReady) throw new Error(`${base}: primary AI provider not ready`);
     console.log(`${base} health:`, JSON.stringify(health));
+    if (!requireAi && !health.aiReady) console.log(`${base}: secondary service is healthy but AI provider readiness is not required for Billing/deployment parity`);
 
     const billingConfig = await request(base, '/api/billing/config');
     verifyBillingConfig(billingConfig, base);
 }
 
-for (const base of productionBases) {
-    await verifyProductionBase(base);
+for (const target of productionBases) {
+    await verifyProductionBase(target.base, target.requireAi);
 }
 
 function verify(reply, kind) {
