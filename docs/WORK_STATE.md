@@ -4,15 +4,16 @@ Updated: 2026-09-26, Europe/Amsterdam
 
 ## Read this first
 
-This is the canonical handoff for future ChatGPT/Codex/Work sessions. Continue from this state. Do not restart Firebase, Google Sign-In, AdMob, palm handling, or Play Billing implementation from the beginning.
+This is the canonical handoff for future ChatGPT/Codex/Work sessions. Continue from this state. Do not restart Firebase, Google Sign-In, AdMob, palm handling, Play Billing implementation, or Firestore deployment diagnosis from the beginning.
 
 ## Canonical baseline
 
 - Repository: `amirhamrouni/basira`
 - Canonical branch: `main`
-- Verified runtime baseline before this handoff-only update: `c463bdd568d57becca8abbe1280956f120ff8066`
+- Last verified runtime commit: `fe17eaa06d2f741692610dcf8abcb3b40fb672a0`
 - Billing implementation PR: `#17`, merged as `69a88a8ff5486ed7a1b54cbc18e2fc4ec4b0cd5a`
 - Permanent Billing production-smoke PR: `#18`, merged as `c463bdd568d57becca8abbe1280956f120ff8066`
+- Firestore/Play activation-prep PR: `#19`, merged as `fe17eaa06d2f741692610dcf8abcb3b40fb672a0`
 - PR `#14` was an experimental AdMob reimplementation and is closed without merge. Do not revive it.
 - Android package: `com.basira.spiritportal`
 - Version currently built: `1.0 (1)`
@@ -65,28 +66,56 @@ Implemented and verified:
 - Client enforces server-written `premiumUntil` as a fail-closed expiry guard.
 - Premium readings do not consume the free-reading allowance or Energy.
 - Raw purchase tokens are not persisted in the billing audit record; only a SHA-256 fingerprint is stored.
-- Firestore rules source prevents clients from changing `vipStatus`, `premiumUntil`, `premiumProductId`, `premiumBasePlanId`, `premiumState`, and `premiumVerifiedAt`.
-- Runtime tests start the real production server and verify health, safe Billing config, and authenticated verification-route placement.
-- Production smoke permanently checks `/api/billing/config` so future deploys cannot silently lose or partially configure the route.
+- Production smoke permanently checks `/api/billing/config`.
+
+## Play subscription UX / policy prep
+
+PR `#19` added pre-purchase and subscription-management safeguards:
+
+- The app displays the real Google Play formatted price and billing period only after Play returns a real offer.
+- The purchase CTA stays disabled until that real offer metadata is loaded.
+- Auto-renewing offers disclose that renewal continues until cancellation; non-auto-renewing offers disclose that they do not renew automatically.
+- The screen explicitly states that BASIRA can also be used without Premium through free readings and rewarded ads.
+- A direct Google Play manage/cancel-subscription link is available from the Premium screen.
+- Product/Base Plan identifiers are still `TBD` and must never be invented in source code.
+
+## Firestore production rules
+
+BASIRA uses the named Firestore database:
+
+`ai-studio-6aad922f-e489-4552-a94a-9a140353fa50`
+
+PR `#19` fixed the deploy path so `firebase.json` explicitly targets this named database rather than relying on the default database.
+
+- Client initialization already uses `getFirestore(app, firebaseConfig.firestoreDatabaseId)`.
+- `scripts/verify-firebase-config.mjs` verifies the project/database target, rules/index files, client DB selection, and protected Premium fields.
+- The normal quality gate runs this validator.
+- Manual workflow `Deploy BASIRA Firestore Rules` exists and requires typing `DEPLOY`.
+- The workflow deploys Firestore rules only and authenticates from GitHub secret `FIREBASE_SERVICE_ACCOUNT_JSON`.
+- The hardened rules are **NOT yet recorded as deployed to Firebase production**. Do not mark them deployed until that workflow (or an equivalent verified Firebase deployment) succeeds against the named database.
 
 ## Verification
 
-Billing implementation code head `574a5b22251ca49c342ba4a39d557bcec0b57ee9` passed:
+Billing implementation head `574a5b22251ca49c342ba4a39d557bcec0b57ee9` passed 24/24 automated tests, TypeScript, Vite build, runtime Billing smoke, Capacitor sync, Android auth gate, Gradle `assembleDebug`, and APK signature verification.
 
-- TypeScript: PASS
-- Automated tests: `24/24` PASS across `8` files
-- Vite production build: PASS
-- Production-server runtime/Billing smoke: PASS
-- Capacitor Android sync: PASS
-- Android OAuth/Web OAuth prebuild gate: PASS
-- AdMob plugin discovery: PASS
-- Gradle `assembleDebug`: PASS, `216` tasks
-- CI APK SHA-256: `3b28dd68ee6810a88b999b58e0032775d98eedee60b0a6bf8a681435a70fc855`
-- APK v2 signature verification: PASS
+Activation-prep head `e5a2dd00aea9ae7408572edc1ee3fe2c89cf1b54` passed:
 
-Final production-smoke follow-up `#18` also passed web-quality and Android build/verification. After its merge, both Render services deployed `c463bdd...` and reached `live`. A production smoke run executed after that final deploy and passed. It explicitly reported `Production Billing config: not configured`, which is the expected safe state until real Play IDs are supplied.
+- Firebase named-database validator: PASS
+- TypeScript/tests/Vite (`npm run check`): PASS
+- Android structure verification: PASS
+- Production smoke before merge: PASS
+- Android debug build: PASS
+- APK signing step: PASS
+- APK verification: PASS
 
-GitHub Actions still does not have `BASIRA_DEBUG_KEYSTORE_BASE64`. Its generated APK uses a runner Android debug certificate and must NOT be treated as an update over the existing BASIRA install.
+After PR `#19` merged as `fe17eaa...`:
+
+- Primary Render service deployed `fe17eaa...`: LIVE
+- Secondary Render service deployed `fe17eaa...`: LIVE
+- Production smoke executed after the final deploy: PASS
+- Billing remains intentionally unconfigured until the real Play catalog exists.
+
+GitHub Actions still does not have the original `BASIRA_DEBUG_KEYSTORE_BASE64`. Do not treat CI APKs as update-compatible with the existing BASIRA installation until signing continuity is restored.
 
 ## Latest known-good installable APK before Billing activation
 
@@ -101,24 +130,32 @@ GitHub Actions still does not have `BASIRA_DEBUG_KEYSTORE_BASE64`. Its generated
 - Primary Render service: `basira-1` at `https://basira-1-2fwh.onrender.com`
 - Secondary Render service: `basira` at `https://basira-qx6d.onrender.com`
 - Both auto-deploy from `main`.
-- Final runtime commit `c463bdd568d57becca8abbe1280956f120ff8066` is live on both.
+- Verified runtime commit `fe17eaa06d2f741692610dcf8abcb3b40fb672a0` is live on both.
 - Public Billing route is present and healthy.
-- Current Billing activation state: `configured: false`.
-- Do not invent Product/Base Plan IDs or fake service-account credentials merely to flip this state.
+- Current Billing activation state remains `configured: false` until exact Play IDs are created and added to Render.
 
-## Remaining external activation gates
+## Next execution sequence
 
-These are not implementation tasks to redo. They require Google/Firebase/signing access that is not available through the current connected tools.
+The next step is external Play Console activation, not more Billing implementation.
 
-1. Create or confirm the real Google Play Subscription Product.
-2. Create or confirm and activate the Base Plan and price.
-3. Set exact `PLAY_SUBSCRIPTION_PRODUCT_ID` and `PLAY_SUBSCRIPTION_BASE_PLAN_ID` on Render.
-4. Configure `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` with Android Publisher API access.
-5. Configure Firestore server-write credentials or equivalent IAM access.
-6. Deploy the hardened `firestore.rules` to Firebase.
-7. Restore `BASIRA_DEBUG_KEYSTORE_BASE64` in GitHub Actions for signing continuity.
-8. From a Play-distributed physical Android build verify: Google Sign-In → rewarded ad after free allowance → real subscription purchase → restore → Premium expiry behavior.
-9. Only after those device gates pass, produce the release AAB and continue Play Console release checks.
+1. In ChatGPT Work / Cloud Browser, open Play Console for BASIRA.
+2. Go to `Monetize with Play → Products → Subscriptions`.
+3. Create or confirm the real Premium Subscription Product. Carefully choose the immutable Product ID.
+4. Create and activate its Base Plan, including billing period, price, countries/regions, renewal/grace/account-hold/resubscribe settings. Carefully choose the Base Plan ID because it cannot be changed/reused after activation.
+5. Record the exact Product ID and Base Plan ID in the canonical work-state files.
+6. Configure Android Publisher API/service-account access and store credentials securely, never in Git.
+7. Set on both intended Render production services:
+   - `PLAY_SUBSCRIPTION_PRODUCT_ID`
+   - `PLAY_SUBSCRIPTION_BASE_PLAN_ID`
+   - `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`
+   - `FIREBASE_SERVICE_ACCOUNT_JSON`
+8. Verify production `/api/billing/config` returns `configured: true` with the exact real IDs.
+9. Deploy hardened Firestore rules to the named BASIRA database and record the successful deployment.
+10. Restore `BASIRA_DEBUG_KEYSTORE_BASE64` for signing continuity.
+11. From a Play-distributed physical Android build verify: Google Sign-In → three free readings → rewarded-ad unlock → real subscription purchase → Premium entitlement → restore → expiry/cancellation behavior.
+12. Only after those device gates pass, produce the release AAB and continue Play Console release checks.
+
+Use `docs/PLAY_ACTIVATION_RUNBOOK.md` as the exact activation checklist. Do not reimplement Billing, AdMob, sign-in, or palm handling.
 
 ## Operational rules
 
@@ -128,4 +165,4 @@ These are not implementation tasks to redo. They require Google/Firebase/signing
 - minSdk: 24
 - Never publish or rotate the existing signing key during troubleshooting.
 - Never commit keystores, private service-account credentials, purchase tokens, or other secrets to Git.
-- Treat this file, `docs/work-state.json`, and `AGENTS.md` as the source of truth for future sessions.
+- Treat this file, `docs/work-state.json`, `docs/PLAY_ACTIVATION_RUNBOOK.md`, and `AGENTS.md` as the source of truth for future sessions.
