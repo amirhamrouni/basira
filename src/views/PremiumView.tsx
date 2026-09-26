@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Zap, Crown, Flame, Gem, ArrowRight, Play, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Sparkles, Zap, Crown, Flame, Gem, ArrowRight, Play, ShieldCheck, RefreshCw, ExternalLink } from 'lucide-react';
 import CosmicRewardModal from '../components/CosmicRewardModal';
 import { useAuth } from '../components/AuthProvider';
 import { doc, updateDoc, increment } from 'firebase/firestore';
@@ -142,6 +142,27 @@ export default function PremiumView({ lang }: any) {
     };
 
     const displayPrice = offer?.formattedPrice || (isAr ? 'السعر من Google Play' : 'Price from Google Play');
+    const formatBillingPeriod = (period?: string) => {
+        const labels: Record<string, [string, string]> = {
+            P1W: ['أسبوعياً', 'weekly'],
+            P4W: ['كل 4 أسابيع', 'every 4 weeks'],
+            P1M: ['شهرياً', 'monthly'],
+            P2M: ['كل شهرين', 'every 2 months'],
+            P3M: ['كل 3 أشهر', 'every 3 months'],
+            P4M: ['كل 4 أشهر', 'every 4 months'],
+            P6M: ['كل 6 أشهر', 'every 6 months'],
+            P8M: ['كل 8 أشهر', 'every 8 months'],
+            P1Y: ['سنوياً', 'yearly'],
+        };
+        if (!period) return isAr ? 'حسب دورة الفوترة المعروضة في Google Play' : 'per the billing period shown by Google Play';
+        const label = labels[period];
+        return label ? (isAr ? label[0] : label[1]) : period;
+    };
+    const billingPeriodLabel = formatBillingPeriod(offer?.billingPeriod);
+    const autoRenews = Boolean(offer?.pricingPhases?.some(phase => phase.recurrenceMode === 1));
+    const manageSubscriptionsUrl = offer?.productId
+        ? `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(offer.productId)}&package=com.basira.spiritportal`
+        : 'https://play.google.com/store/account/subscriptions';
 
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col gap-6 w-full pb-10 min-h-screen">
@@ -171,7 +192,7 @@ export default function PremiumView({ lang }: any) {
             )}
 
             <div className={`relative overflow-hidden rounded-3xl p-6 border shadow-lg ${isPremium ? 'border-green-300 bg-green-50' : 'border-stella-gold/40 bg-white'}`}>
-                <div className="flex items-start gap-4 mb-5"><div className="p-3 rounded-2xl bg-stella-gold/10 border border-stella-gold/30"><Crown className="w-7 h-7 text-stella-gold" /></div><div className="flex-1"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-gray-800 font-amiri">BASIRA Premium</h2>{isPremium && <span className="rounded-full bg-green-100 px-2 py-1 text-[10px] font-bold text-green-700">{isAr ? 'نشط' : 'ACTIVE'}</span>}</div><p className="text-sm font-bold text-stella-gold mt-1">{isPremium ? (isAr ? 'اشتراكك موثّق' : 'Verified subscription') : displayPrice}</p>{offer?.billingPeriod && !isPremium && <p className="text-[11px] text-gray-400 mt-1">{offer.billingPeriod}</p>}</div></div>
+                <div className="flex items-start gap-4 mb-5"><div className="p-3 rounded-2xl bg-stella-gold/10 border border-stella-gold/30"><Crown className="w-7 h-7 text-stella-gold" /></div><div className="flex-1"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-gray-800 font-amiri">BASIRA Premium</h2>{isPremium && <span className="rounded-full bg-green-100 px-2 py-1 text-[10px] font-bold text-green-700">{isAr ? 'نشط' : 'ACTIVE'}</span>}</div><p className="text-sm font-bold text-stella-gold mt-1">{isPremium ? (isAr ? 'اشتراكك موثّق' : 'Verified subscription') : displayPrice}</p>{offer?.billingPeriod && !isPremium && <p className="text-[11px] text-gray-400 mt-1">{billingPeriodLabel}</p>}</div></div>
 
                 <ul className="space-y-3 text-sm text-gray-600 mb-6">
                     <li className="flex gap-2"><Sparkles className="w-4 h-4 text-stella-gold shrink-0 mt-0.5" />{isAr ? 'قراءات الكف والفنجان بلا استهلاك للقراءات المجانية أو الطاقة' : 'Palm and coffee readings without consuming free slots or Energy'}</li>
@@ -179,8 +200,31 @@ export default function PremiumView({ lang }: any) {
                     <li className="flex gap-2"><Sparkles className="w-4 h-4 text-stella-gold shrink-0 mt-0.5" />{isAr ? 'الاشتراك والتحقق والاسترجاع عبر Google Play' : 'Purchase, verification and restore through Google Play'}</li>
                 </ul>
 
-                {!isPremium && <button type="button" disabled={billingBusy} onClick={() => void handleSubscribe()} className="w-full rounded-2xl bg-stella-gold py-4 font-bold text-white shadow-md disabled:opacity-50">{billingBusy ? (isAr ? 'جارٍ التحقق...' : 'Checking...') : (isAr ? `اشترك عبر Google Play · ${displayPrice}` : `Subscribe with Google Play · ${displayPrice}`)}</button>}
+                {offer && (
+                    <div className="mb-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs leading-5 text-gray-600">
+                        <p className="font-semibold text-gray-700">
+                            {autoRenews
+                                ? (isAr
+                                    ? `${displayPrice}، ${billingPeriodLabel}. يتجدد الاشتراك تلقائياً حتى تقوم بإلغائه.`
+                                    : `${displayPrice}, ${billingPeriodLabel}. The subscription renews automatically until you cancel.`)
+                                : (isAr
+                                    ? `${displayPrice}، ${billingPeriodLabel}. لا يتم التجديد تلقائياً حسب الخطة المعروضة من Google Play.`
+                                    : `${displayPrice}, ${billingPeriodLabel}. This plan does not auto-renew according to the Google Play offer.`)}
+                        </p>
+                        <p className="mt-2">
+                            {isAr
+                                ? 'BASIRA تعمل أيضاً بدون اشتراك عبر القراءات المجانية وإعلانات المكافأة. يمكنك إدارة أو إلغاء اشتراكك في Google Play.'
+                                : 'BASIRA also works without a subscription through free readings and rewarded ads. You can manage or cancel your subscription in Google Play.'}
+                        </p>
+                    </div>
+                )}
+
+                {!isPremium && <button type="button" disabled={billingBusy || !offer} onClick={() => void handleSubscribe()} className="w-full rounded-2xl bg-stella-gold py-4 font-bold text-white shadow-md disabled:opacity-50">{billingBusy ? (isAr ? 'جارٍ التحقق...' : 'Checking...') : !offer ? (isAr ? 'جارٍ تحميل عرض Google Play...' : 'Loading Google Play offer...') : (isAr ? `اشترك عبر Google Play · ${displayPrice}` : `Subscribe with Google Play · ${displayPrice}`)}</button>}
                 <button type="button" disabled={billingBusy} onClick={() => void handleRestore()} className="mt-3 w-full rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-600 disabled:opacity-50 flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4" />{isAr ? 'استرجاع الاشتراك' : 'Restore subscription'}</button>
+                <a href={manageSubscriptionsUrl} target="_blank" rel="noreferrer" className="mt-3 w-full rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-600 flex items-center justify-center gap-2">
+                    <ExternalLink className="w-4 h-4" />
+                    {isAr ? 'إدارة أو إلغاء الاشتراك في Google Play' : 'Manage or cancel subscription in Google Play'}
+                </a>
             </div>
 
             {billingMessage && <div role="status" className="rounded-2xl border border-green-200 bg-green-50 p-4 text-center text-sm text-green-800">{billingMessage}</div>}
