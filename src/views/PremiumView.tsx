@@ -6,6 +6,7 @@ import { useAuth } from '../components/AuthProvider';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db, analytics, remoteConfig, getValue } from '../firebase';
 import { logEvent } from 'firebase/analytics';
+import { isPremiumProfile } from '../utils/freeReadings';
 import {
     isNativeAndroid,
     isPlayBillingConfigured,
@@ -29,7 +30,7 @@ export default function PremiumView({ lang }: any) {
     const xp = profile?.xp || 0;
     const level = profile?.level || 1;
     const nextLevelXp = level * 1000;
-    const isPremium = profile?.vipStatus === 'oracle' || profile?.vipStatus === 'adept';
+    const isPremium = isPremiumProfile(profile);
     const rewardAmount = remoteConfig ? getValue(remoteConfig, 'ad_reward_energy').asNumber() : 10;
 
     useEffect(() => {
