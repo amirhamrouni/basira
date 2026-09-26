@@ -35,6 +35,16 @@ for (let attempt = 0; attempt < 10; attempt++) {
 if (health?.status !== 'ok' || !health.aiReady) throw new Error('Production health or provider not ready');
 console.log('Production health:', JSON.stringify(health));
 
+const billingConfig = await request('/api/billing/config');
+if (typeof billingConfig?.configured !== 'boolean') throw new Error('Billing config missing configured flag');
+if (billingConfig.configured) {
+    if (typeof billingConfig.productId !== 'string' || !billingConfig.productId.trim()) throw new Error('Billing configured without productId');
+    if (typeof billingConfig.basePlanId !== 'string' || !billingConfig.basePlanId.trim()) throw new Error('Billing configured without basePlanId');
+} else if (billingConfig.productId !== null || billingConfig.basePlanId !== null) {
+    throw new Error('Unconfigured Billing must not expose partial IDs');
+}
+console.log(`Production Billing config: ${billingConfig.configured ? 'configured' : 'not configured'}`);
+
 const cards = [
     { position: 'الماضي', name: 'Two of Wands', nameAr: 'اثنان العصي', theme: 'اختيار بين مسارين', reflection: 'القرار مُعلّق' },
     { position: 'الحاضر', name: 'Eight of Pentacles', nameAr: 'ثمانية العملات', theme: 'تدريب ومهارة', reflection: 'تحضير عرض عمل' },
