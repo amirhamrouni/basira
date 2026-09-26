@@ -9,9 +9,7 @@ import { logEvent } from 'firebase/analytics';
 import { isPremiumProfile } from '../utils/freeReadings';
 import {
     isNativeAndroid,
-    isPlayBillingConfigured,
     loadPlaySubscriptionOffer,
-    PLAY_PRODUCT_ID,
     restorePlaySubscriptions,
     startPlaySubscriptionPurchase,
     verifyPlaySubscription,
@@ -35,14 +33,20 @@ export default function PremiumView({ lang }: any) {
 
     useEffect(() => {
         let cancelled = false;
-        if (!isNativeAndroid() || !isPlayBillingConfigured()) return;
+        if (!isNativeAndroid()) return;
         loadPlaySubscriptionOffer()
-            .then(value => { if (!cancelled) setOffer(value); })
+            .then(value => {
+                if (cancelled) return;
+                setOffer(value);
+                setBillingError(null);
+            })
             .catch(error => {
                 console.warn('Play subscription offer unavailable', error);
-                if (!cancelled) setBillingError(isAr
-                    ? 'تعذّر تحميل عرض الاشتراك من Google Play حالياً.'
-                    : 'Could not load the Google Play subscription offer.');
+                if (cancelled) return;
+                const notConfigured = String(error?.message || error).includes('PLAY_BILLING_NOT_CONFIGURED');
+                setBillingError(notConfigured
+                    ? (isAr ? 'اشتراك Google Play لم يُربط بمنتج فعلي بعد.' : 'The Google Play subscription product is not configured yet.')
+                    : (isAr ? 'تعذّر تحميل عرض الاشتراك من Google Play حالياً.' : 'Could not load the Google Play subscription offer.'));
             });
         return () => { cancelled = true; };
     }, [isAr]);
@@ -59,10 +63,6 @@ export default function PremiumView({ lang }: any) {
     const requireBillingReady = () => {
         if (!isNativeAndroid()) {
             setBillingError(isAr ? 'الاشتراك متاح داخل تطبيق Android عبر Google Play.' : 'Subscriptions are available in the Android app through Google Play.');
-            return false;
-        }
-        if (!isPlayBillingConfigured()) {
-            setBillingError(isAr ? 'اشتراك Google Play لم يُربط بمنتج فعلي بعد.' : 'The Google Play subscription product is not configured yet.');
             return false;
         }
         return true;
@@ -93,11 +93,14 @@ export default function PremiumView({ lang }: any) {
                 setBillingMessage(isAr ? 'تم استلام العملية لكن Google Play لم تعتبر الاشتراك نشطاً بعد.' : 'The purchase was received, but Google Play does not report an active entitlement yet.');
                 return;
             }
-            if (analytics) logEvent(analytics, 'subscription_verified', { product_id: verified.productId || PLAY_PRODUCT_ID });
+            if (analytics) logEvent(analytics, 'subscription_verified', { product_id: verified.productId || 'play_subscription' });
             setBillingMessage(isAr ? 'تم التحقق من الاشتراك وتفعيل BASIRA Premium.' : 'Subscription verified. BASIRA Premium is active.');
         } catch (error) {
             console.error('Subscription purchase failed', error);
-            setBillingError(isAr ? 'تعذّر إكمال الاشتراك أو التحقق منه. لم يتم منح Premium بدون تحقق Google Play.' : 'Could not complete or verify the subscription. Premium was not granted without Google Play verification.');
+            const notConfigured = String((error as Error)?.message || error).includes('PLAY_BILLING_NOT_CONFIGURED');
+            setBillingError(notConfigured
+                ? (isAr ? 'اشتراك Google Play لم يُربط بمنتج فعلي بعد.' : 'The Google Play subscription product is not configured yet.')
+                : (isAr ? 'تعذّر إكمال الاشتراك أو التحقق منه. لم يتم منح Premium بدون تحقق Google Play.' : 'Could not complete or verify the subscription. Premium was not granted without Google Play verification.'));
         } finally {
             setBillingBusy(false);
         }
@@ -113,8 +116,8 @@ export default function PremiumView({ lang }: any) {
         if (!requireBillingReady()) return;
         setBillingBusy(true);
         try {
-            const purchases = await restorePlaySubscriptions();
-            const candidates = purchases.filter(purchase => purchase.purchaseToken && purchase.products?.includes(PLAY_PRODUCT_ID));
+            const { purchases, productId } = await restorePlaySubscriptions();
+            const candidates = purchases.filter(purchase => purchase.purchaseToken && purchase.products?.includes(productId));
             if (!candidates.length) {
                 setBillingMessage(isAr ? 'لم نجد اشتراكاً نشطاً لهذا الحساب في Google Play.' : 'No subscription for this account was found in Google Play.');
                 return;
@@ -129,7 +132,10 @@ export default function PremiumView({ lang }: any) {
             setBillingMessage(isAr ? 'وجدنا عملية سابقة، لكنها ليست اشتراكاً مستحقاً حالياً.' : 'A previous purchase was found, but it is not currently entitled.');
         } catch (error) {
             console.error('Subscription restore failed', error);
-            setBillingError(isAr ? 'تعذّر استرجاع الاشتراك من Google Play.' : 'Could not restore the Google Play subscription.');
+            const notConfigured = String((error as Error)?.message || error).includes('PLAY_BILLING_NOT_CONFIGURED');
+            setBillingError(notConfigured
+                ? (isAr ? 'اشتراك Google Play لم يُربط بمنتج فعلي بعد.' : 'The Google Play subscription product is not configured yet.')
+                : (isAr ? 'تعذّر استرجاع الاشتراك من Google Play.' : 'Could not restore the Google Play subscription.'));
         } finally {
             setBillingBusy(false);
         }
