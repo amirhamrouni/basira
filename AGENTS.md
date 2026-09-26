@@ -1,6 +1,14 @@
 # BASIRA Agent Operating Contract
 
-Read `docs/WORK_STATE.md`, `docs/work-state.json`, and `docs/PLAY_ACTIVATION_RUNBOOK.md` before changing BASIRA. Treat them as the source of truth and update the work-state files after every verified milestone.
+## Mandatory session resume point
+
+**Every new BASIRA session MUST begin by reading `docs/SESSION_ENTRYPOINT.md` first.** Then read `docs/WORK_STATE.md`, `docs/work-state.json`, and `docs/PLAY_ACTIVATION_RUNBOOK.md`.
+
+Until the activation sequence in `docs/SESSION_ENTRYPOINT.md` is completed, resume from its first unfinished item. Do not restart phases 1–5 or reimplement Firebase, Google Sign-In, AdMob, palm handling, AI, Billing, Firestore targeting, R8 fixes, or release pipelines unless a verified regression proves something is broken.
+
+Current canonical phase: **Phase 6 — Google Play commercial activation**.
+
+Treat the listed handoff files as the source of truth and update the work-state files after every verified milestone.
 
 ## Work mode
 
