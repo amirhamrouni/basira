@@ -22,4 +22,11 @@ describe('free reading allowance', () => {
         expect(isPremiumProfile({ vipStatus: 'premium' })).toBe(false);
         expect(isPremiumProfile(null)).toBe(false);
     });
+
+    it('stops Play premium after the server-written expiry timestamp', () => {
+        const now = Date.parse('2026-09-26T00:00:00Z');
+        expect(isPremiumProfile({ vipStatus: 'oracle', premiumUntil: '2026-10-26T00:00:00Z' }, now)).toBe(true);
+        expect(isPremiumProfile({ vipStatus: 'oracle', premiumUntil: '2026-09-25T23:59:59Z' }, now)).toBe(false);
+        expect(isPremiumProfile({ vipStatus: 'oracle', premiumUntil: 'not-a-date' }, now)).toBe(false);
+    });
 });
