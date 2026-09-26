@@ -4,10 +4,25 @@ export type FreeReadingType = 'palmistry' | 'coffee';
 export type MeteredReadingType = FreeReadingType | 'tarot' | 'divination';
 export const FREE_READINGS_PER_TYPE = 3;
 
-type ReadingProfile = { vipStatus?: unknown; freeReadings?: Record<string, unknown> } | null | undefined;
+type ReadingProfile = {
+    vipStatus?: unknown;
+    premiumUntil?: unknown;
+    freeReadings?: Record<string, unknown>;
+} | null | undefined;
 
-export function isPremiumProfile(profile: ReadingProfile): boolean {
-    return profile?.vipStatus === 'adept' || profile?.vipStatus === 'oracle';
+export function isPremiumProfile(profile: ReadingProfile, nowMs = Date.now()): boolean {
+    const serverPremium = profile?.vipStatus === 'adept' || profile?.vipStatus === 'oracle';
+    if (!serverPremium) return false;
+
+    // Play subscriptions receive a server-written expiry. Never keep a stale
+    // entitlement active after that timestamp merely because vipStatus has not
+    // yet been refreshed. Legacy/admin premium grants may omit premiumUntil.
+    if (typeof profile?.premiumUntil === 'string' && profile.premiumUntil.trim()) {
+        const expiryMs = Date.parse(profile.premiumUntil);
+        return Number.isFinite(expiryMs) && expiryMs > nowMs;
+    }
+
+    return true;
 }
 
 export function usedFreeReadings(profile: ReadingProfile, type: FreeReadingType): number {
@@ -24,8 +39,8 @@ export function remainingFreeReadings(profile: ReadingProfile, type: FreeReading
 
 // The profile update and reading history entry commit together. The transaction
 // checks current server values so concurrent reads cannot use one free slot twice.
-// Premium is derived only from the server-controlled vipStatus field; Firestore
-// rules prevent a normal user from changing that field on the client.
+// Premium is derived only from server-controlled fields; Firestore rules prevent
+// a normal user from changing vipStatus on the client.
 export async function saveMeteredReading(db: Firestore, userId: string, type: MeteredReadingType, result: string): Promise<'free' | 'energy' | 'premium'> {
     const userRef = doc(db, 'users', userId);
     const readingRef = doc(collection(db, 'users', userId, 'readings'));
