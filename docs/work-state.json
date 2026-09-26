@@ -1,11 +1,12 @@
 {
-  "schema_version": 3,
-  "updated_at": "2026-09-26T02:35:00+02:00",
+  "schema_version": 4,
+  "updated_at": "2026-09-26T02:47:00+02:00",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "canonical_branch": "main",
+  "last_verified_runtime_head": "c463bdd568d57becca8abbe1280956f120ff8066",
   "billing_pr": 17,
-  "last_verified_code_head": "574a5b22251ca49c342ba4a39d557bcec0b57ee9",
+  "billing_production_smoke_pr": 18,
   "android": {
     "application_id": "com.basira.spiritportal",
     "version_name": "1.0",
@@ -62,6 +63,8 @@
     "raw_purchase_token_persisted": false,
     "premium_expiry_guard": true,
     "local_free_beta_removed": true,
+    "production_route_verified": true,
+    "production_config_state": "not_configured",
     "subscription_product_created_or_verified": false,
     "product_id": null,
     "base_plan_id": null,
@@ -71,24 +74,31 @@
     "device_restore_test": "not_started"
   },
   "verification": {
-    "verified_code_head": "574a5b22251ca49c342ba4a39d557bcec0b57ee9",
+    "billing_code_head": "574a5b22251ca49c342ba4a39d557bcec0b57ee9",
+    "final_runtime_head": "c463bdd568d57becca8abbe1280956f120ff8066",
     "typescript": "pass",
     "tests": "24/24 pass",
     "test_files": 8,
     "vite_build": "pass",
-    "production_smoke": "pass",
-    "billing_runtime_smoke": "pass",
+    "production_server_runtime_smoke": "pass",
+    "permanent_billing_production_smoke": "pass",
+    "post_final_deploy_production_smoke": "pass",
+    "production_billing_config_observed": "not configured",
     "capacitor_sync": "pass",
     "android_auth_gate": "pass",
     "gradle_debug_build": "pass",
-    "gradle_tasks": 216,
-    "github_ci_debug_apk_sha256": "3b28dd68ee6810a88b999b58e0032775d98eedee60b0a6bf8a681435a70fc855",
+    "android_followup_build_after_pr18": "pass",
+    "github_ci_debug_apk_sha256_for_billing_head": "3b28dd68ee6810a88b999b58e0032775d98eedee60b0a6bf8a681435a70fc855",
     "github_ci_debug_certificate_continuity": "not_verified_missing_original_signing_secret"
   },
   "production": {
     "primary_render_service": "basira-1",
     "primary_url": "https://basira-1-2fwh.onrender.com",
+    "secondary_render_service": "basira",
+    "secondary_url": "https://basira-qx6d.onrender.com",
     "auto_deploy_branch": "main",
+    "runtime_head_live_on_primary": "c463bdd568d57becca8abbe1280956f120ff8066",
+    "runtime_head_live_on_secondary": "c463bdd568d57becca8abbe1280956f120ff8066",
     "billing_safe_when_unconfigured": true
   },
   "latest_installable_known_good_apk": {
@@ -110,10 +120,11 @@
     "Run real purchase and restore tests from a Play-distributed build on a physical Android device"
   ],
   "next_steps": [
-    "Do not reimplement Billing, AdMob, or palm handling",
+    "Do not reimplement Billing, AdMob, Google sign-in, or palm handling",
     "Finish Play Console product/base-plan activation using the exact IDs",
     "Configure Render runtime IDs and server credentials",
     "Deploy Firestore rules",
+    "Restore signing-key secret in GitHub Actions",
     "Run physical-device sign-in, rewarded-ad, purchase, restore, and expiry tests",
     "Produce the release AAB only after all device gates pass"
   ]
