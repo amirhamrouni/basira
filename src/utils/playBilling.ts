@@ -46,22 +46,37 @@ interface BasiraBillingPlugin {
     restoreSubscriptions(): Promise<RestoreResult>;
 }
 
-const NativeBilling = registerPlugin<BasiraBillingPlugin>('BasiraBilling');
-
-export const PLAY_PRODUCT_ID = (import.meta.env.VITE_PLAY_SUBSCRIPTION_PRODUCT_ID as string | undefined)?.trim() || '';
-export const PLAY_BASE_PLAN_ID = (import.meta.env.VITE_PLAY_SUBSCRIPTION_BASE_PLAN_ID as string | undefined)?.trim() || '';
-
-export function isPlayBillingConfigured(): boolean {
-    return Boolean(PLAY_PRODUCT_ID && PLAY_BASE_PLAN_ID);
+export interface PlayBillingConfig {
+    configured: boolean;
+    productId: string;
+    basePlanId: string;
 }
+
+const NativeBilling = registerPlugin<BasiraBillingPlugin>('BasiraBilling');
+let configCache: { value: PlayBillingConfig; expiresAt: number } | null = null;
 
 export function isNativeAndroid(): boolean {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 }
 
-function requireBillingConfiguration() {
+async function requirePlayBillingConfig(): Promise<PlayBillingConfig> {
     if (!isNativeAndroid()) throw new Error('PLAY_BILLING_ANDROID_ONLY');
-    if (!isPlayBillingConfigured()) throw new Error('PLAY_BILLING_NOT_CONFIGURED');
+    if (configCache && configCache.expiresAt > Date.now()) return configCache.value;
+
+    const response = await fetch(getApiUrl('/api/billing/config'), { method: 'GET' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `PLAY_BILLING_CONFIG_FAILED_${response.status}`);
+
+    const productId = typeof data.productId === 'string' ? data.productId.trim() : '';
+    const basePlanId = typeof data.basePlanId === 'string' ? data.basePlanId.trim() : '';
+    const config: PlayBillingConfig = {
+        configured: Boolean(data.configured && productId && basePlanId),
+        productId,
+        basePlanId,
+    };
+    if (!config.configured) throw new Error('PLAY_BILLING_NOT_CONFIGURED');
+    configCache = { value: config, expiresAt: Date.now() + 5 * 60_000 };
+    return config;
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -71,23 +86,26 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 export async function loadPlaySubscriptionOffer(): Promise<SubscriptionOffer> {
-    requireBillingConfiguration();
-    return NativeBilling.getSubscriptionOffer({ productId: PLAY_PRODUCT_ID, basePlanId: PLAY_BASE_PLAN_ID });
+    const { productId, basePlanId } = await requirePlayBillingConfig();
+    return NativeBilling.getSubscriptionOffer({ productId, basePlanId });
 }
 
 export async function startPlaySubscriptionPurchase(user: User): Promise<NativePurchase> {
-    requireBillingConfiguration();
+    const { productId, basePlanId } = await requirePlayBillingConfig();
     return NativeBilling.purchaseSubscription({
-        productId: PLAY_PRODUCT_ID,
-        basePlanId: PLAY_BASE_PLAN_ID,
+        productId,
+        basePlanId,
         obfuscatedAccountId: await sha256Hex(user.uid),
     });
 }
 
-export async function restorePlaySubscriptions(): Promise<NativePurchase[]> {
-    requireBillingConfiguration();
+export async function restorePlaySubscriptions(): Promise<{ purchases: NativePurchase[]; productId: string }> {
+    const { productId } = await requirePlayBillingConfig();
     const result = await NativeBilling.restoreSubscriptions();
-    return Array.isArray(result.purchases) ? result.purchases : [];
+    return {
+        purchases: Array.isArray(result.purchases) ? result.purchases : [],
+        productId,
+    };
 }
 
 export interface VerifiedSubscription {
