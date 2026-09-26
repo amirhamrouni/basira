@@ -17,9 +17,20 @@ async function request(base, path, body) {
 }
 
 function verifyBillingConfig(config, base) {
-    for (const field of ['configured', 'catalogConfigured', 'serverVerificationReady']) {
-        if (typeof config?.[field] !== 'boolean') throw new Error(`${base}: Billing config missing ${field}`);
+    if (typeof config?.configured !== 'boolean') throw new Error(`${base}: Billing config missing configured`);
+
+    const hasExtendedReadiness = typeof config.catalogConfigured === 'boolean' && typeof config.serverVerificationReady === 'boolean';
+    if (!hasExtendedReadiness) {
+        if (config.configured) {
+            if (typeof config.productId !== 'string' || !config.productId.trim()) throw new Error(`${base}: legacy Billing configured without productId`);
+            if (typeof config.basePlanId !== 'string' || !config.basePlanId.trim()) throw new Error(`${base}: legacy Billing configured without basePlanId`);
+        } else if (config.productId !== null || config.basePlanId !== null) {
+            throw new Error(`${base}: legacy unconfigured Billing must not expose partial IDs`);
+        }
+        console.log(`${base} Billing: legacy schema detected before rollout; configured=${config.configured}`);
+        return;
     }
+
     if (config.configured !== Boolean(config.catalogConfigured && config.serverVerificationReady)) {
         throw new Error(`${base}: Billing configured flag disagrees with catalog/server readiness`);
     }
@@ -29,6 +40,7 @@ function verifyBillingConfig(config, base) {
     } else if (config.productId !== null || config.basePlanId !== null) {
         throw new Error(`${base}: Billing must not expose partial IDs when catalog is unconfigured`);
     }
+    console.log(`${base} Billing: configured=${config.configured}, catalog=${config.catalogConfigured}, serverVerification=${config.serverVerificationReady}`);
 }
 
 async function verifyProductionBase(base) {
@@ -47,7 +59,6 @@ async function verifyProductionBase(base) {
 
     const billingConfig = await request(base, '/api/billing/config');
     verifyBillingConfig(billingConfig, base);
-    console.log(`${base} Billing: configured=${billingConfig.configured}, catalog=${billingConfig.catalogConfigured}, serverVerification=${billingConfig.serverVerificationReady}`);
 }
 
 for (const base of productionBases) {
