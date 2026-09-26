@@ -92,9 +92,20 @@ jobs:
             echo "::notice::Release bundle structure is valid, but it is not publishable until release signing secrets are configured."
           fi
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload signed release AAB
+        if: steps.signing.outputs.signed == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          name: basira-release-aab-candidate
+          name: basira-release-aab-signed
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload unsigned release candidate
+        if: steps.signing.outputs.signed != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: basira-release-aab-unsigned-candidate
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 7

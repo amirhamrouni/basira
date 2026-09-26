@@ -48,6 +48,8 @@ interface BasiraBillingPlugin {
 
 export interface PlayBillingConfig {
     configured: boolean;
+    catalogConfigured: boolean;
+    serverVerificationReady: boolean;
     productId: string;
     basePlanId: string;
 }
@@ -69,12 +71,20 @@ async function requirePlayBillingConfig(): Promise<PlayBillingConfig> {
 
     const productId = typeof data.productId === 'string' ? data.productId.trim() : '';
     const basePlanId = typeof data.basePlanId === 'string' ? data.basePlanId.trim() : '';
+    const catalogConfigured = Boolean(data.catalogConfigured && productId && basePlanId);
+    const serverVerificationReady = Boolean(data.serverVerificationReady);
     const config: PlayBillingConfig = {
-        configured: Boolean(data.configured && productId && basePlanId),
+        configured: Boolean(data.configured && catalogConfigured && serverVerificationReady),
+        catalogConfigured,
+        serverVerificationReady,
         productId,
         basePlanId,
     };
+
+    if (!config.catalogConfigured) throw new Error('PLAY_BILLING_CATALOG_NOT_CONFIGURED');
+    if (!config.serverVerificationReady) throw new Error('PLAY_BILLING_SERVER_NOT_READY');
     if (!config.configured) throw new Error('PLAY_BILLING_NOT_CONFIGURED');
+
     configCache = { value: config, expiresAt: Date.now() + 5 * 60_000 };
     return config;
 }
