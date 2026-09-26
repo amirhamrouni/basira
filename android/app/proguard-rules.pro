@@ -5,6 +5,13 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
+# BASIRA enables Google native auth only. @capacitor-firebase/authentication
+# ships Facebook handler bytecode even when its optional Android Facebook SDK
+# dependency is not enabled (rgcfaIncludeFacebook is intentionally absent).
+# R8 must therefore ignore those unreachable optional SDK references rather
+# than forcing the full Facebook SDK into a Google-only release build.
+-dontwarn com.facebook.**
+
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:
