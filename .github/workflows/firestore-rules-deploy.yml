@@ -7,16 +7,13 @@ on:
         description: 'Type DEPLOY to publish BASIRA Firestore rules to production'
         required: true
         type: string
-  push:
-    branches:
-      - ops/firestore-deploy-once
 
 permissions:
   contents: read
 
 jobs:
   deploy-rules:
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.confirm_production == 'DEPLOY') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy-firestore-rules]')) }}
+    if: ${{ inputs.confirm_production == 'DEPLOY' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
