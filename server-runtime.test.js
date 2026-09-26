@@ -32,6 +32,8 @@ describe('production server runtime wiring', () => {
                 VITE_GEMINI_API_KEY: '',
                 OPENAI_API_KEY: '',
                 GROQ_API_KEY: '',
+                PLAY_SUBSCRIPTION_PRODUCT_ID: '',
+                PLAY_SUBSCRIPTION_BASE_PLAN_ID: '',
             },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
@@ -54,6 +56,13 @@ describe('production server runtime wiring', () => {
         const data = await response.json();
         expect(response.status).toBe(200);
         expect(data.status).toBe('ok');
+    });
+
+    it('serves safe public Billing config without exposing invented IDs', async () => {
+        const response = await fetch(`${BASE}/api/billing/config`);
+        const data = await response.json();
+        expect(response.status).toBe(200);
+        expect(data).toEqual({ configured: false, productId: null, basePlanId: null });
     });
 
     it('mounts billing before the core API 404 and requires Firebase auth', async () => {
