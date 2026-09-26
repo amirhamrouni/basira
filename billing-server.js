@@ -113,6 +113,10 @@ function expectedAccountId(uid) {
     return crypto.createHash('sha256').update(uid).digest('hex');
 }
 
+function purchaseTokenFingerprint(purchaseToken) {
+    return crypto.createHash('sha256').update(purchaseToken).digest('hex');
+}
+
 export function evaluateSubscriptionPurchase(purchase, expectedProductId, expectedBasePlanId, nowMs = Date.now()) {
     if (!purchase || typeof purchase !== 'object') return { entitled: false, reason: 'INVALID_PURCHASE' };
     const lineItems = Array.isArray(purchase.lineItems) ? purchase.lineItems : [];
@@ -233,7 +237,7 @@ export function installBillingRoutes(app) {
 
             await patchFirestoreDocument('billingEntitlements', uid, {
                 uid,
-                purchaseToken,
+                purchaseTokenHash: purchaseTokenFingerprint(purchaseToken),
                 productId,
                 basePlanId,
                 subscriptionState: evaluation.subscriptionState || 'UNKNOWN',
