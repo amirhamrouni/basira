@@ -19,6 +19,12 @@ function decodeJwtPart(part) {
     return JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
 }
 
+function playBillingConfig() {
+    const productId = (process.env.PLAY_SUBSCRIPTION_PRODUCT_ID || '').trim();
+    const basePlanId = (process.env.PLAY_SUBSCRIPTION_BASE_PLAN_ID || '').trim();
+    return { productId, basePlanId, configured: Boolean(productId && basePlanId) };
+}
+
 function parseServiceAccount(value, name) {
     if (!value) throw new Error(`${name}_MISSING`);
     let text = value.trim();
@@ -192,6 +198,15 @@ function bearerToken(req) {
 }
 
 export function installBillingRoutes(app) {
+    app.get('/api/billing/config', (req, res) => {
+        const { productId, basePlanId, configured } = playBillingConfig();
+        return res.json({
+            configured,
+            productId: configured ? productId : null,
+            basePlanId: configured ? basePlanId : null,
+        });
+    });
+
     app.post('/api/billing/verify-subscription', async (req, res) => {
         try {
             const idToken = bearerToken(req);
@@ -200,9 +215,8 @@ export function installBillingRoutes(app) {
             const purchaseToken = typeof req.body?.purchaseToken === 'string' ? req.body.purchaseToken.trim() : '';
             if (!purchaseToken || purchaseToken.length > 4096) return res.status(400).json({ error: 'INVALID_PURCHASE_TOKEN' });
 
-            const productId = (process.env.PLAY_SUBSCRIPTION_PRODUCT_ID || '').trim();
-            const basePlanId = (process.env.PLAY_SUBSCRIPTION_BASE_PLAN_ID || '').trim();
-            if (!productId || !basePlanId) return res.status(503).json({ error: 'PLAY_SUBSCRIPTION_NOT_CONFIGURED' });
+            const { productId, basePlanId, configured } = playBillingConfig();
+            if (!configured) return res.status(503).json({ error: 'PLAY_SUBSCRIPTION_NOT_CONFIGURED' });
 
             const playServiceAccount = parseServiceAccount(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || '', 'GOOGLE_PLAY_SERVICE_ACCOUNT_JSON');
             const firestoreServiceAccount = parseServiceAccount(
