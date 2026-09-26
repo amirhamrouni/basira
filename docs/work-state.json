@@ -1,14 +1,15 @@
 {
-  "schema_version": 6,
-  "updated_at": "2026-09-26",
+  "schema_version": 7,
+  "updated_at": "2026-09-26T04:01:00+02:00",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "canonical_branch": "main",
-  "last_verified_runtime_head": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
+  "last_verified_runtime_head": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
   "billing_pr": 17,
   "billing_production_smoke_pr": 18,
   "activation_prep_pr": 19,
   "release_pipeline_pr": 20,
+  "readiness_truth_gates_pr": 21,
   "android": {
     "application_id": "com.basira.spiritportal",
     "version_name": "1.0",
@@ -22,26 +23,15 @@
       "sha256": "C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68"
     },
     "github_actions_debug_signing_secret": "missing",
-    "release_signing_secrets": {
-      "BASIRA_RELEASE_KEYSTORE_BASE64": "missing",
-      "BASIRA_RELEASE_KEYSTORE_PASSWORD": "missing",
-      "BASIRA_RELEASE_KEY_ALIAS": "missing",
-      "BASIRA_RELEASE_KEY_PASSWORD": "missing"
-    }
+    "release_signing_secrets": "missing_or_incomplete"
   },
   "firebase": {
     "project_id": "gen-lang-client-0217548336",
     "firestore_database_id": "ai-studio-6aad922f-e489-4552-a94a-9a140353fa50",
-    "android_oauth_client_verified": true,
-    "web_oauth_client_verified": true,
-    "client_uses_named_database": true,
-    "firebase_json_targets_named_database": true,
-    "firebase_target_validator_in_ci": true,
     "firestore_rules_hardened_in_source": true,
-    "firestore_rules_deploy_workflow": "Deploy BASIRA Firestore Rules",
     "firestore_rules_deployed": false,
     "firebase_service_account_secret": "missing",
-    "deploy_attempt": {
+    "last_rules_deploy_attempt": {
       "run_id": 36207958916,
       "job_id": 108308392804,
       "target_validator": "pass",
@@ -65,8 +55,6 @@
     "plugin_version": "8.1.0",
     "app_id": "ca-app-pub-1233451496176046~9839666227",
     "rewarded_ad_unit_id": "ca-app-pub-1233451496176046/5417205489",
-    "native_plugin_wired": true,
-    "simulated_timer_removed": true,
     "reward_callback_required": true,
     "device_test": "pending"
   },
@@ -75,20 +63,18 @@
     "billing_library": "9.1.0",
     "native_plugin": "BasiraBillingPlugin",
     "runtime_config_endpoint": "/api/billing/config",
-    "ids_hardcoded_in_apk_or_aab": false,
-    "server_purchase_verification": true,
-    "firebase_id_token_verification": true,
-    "uid_purchase_binding": true,
-    "server_acknowledgement": true,
-    "raw_purchase_token_persisted": false,
-    "premium_expiry_guard": true,
-    "local_free_beta_removed": true,
-    "production_route_verified": true,
-    "production_config_state": "not_configured",
-    "subscription_policy_disclosures_added": true,
-    "manage_cancel_play_link_added": true,
-    "purchase_disabled_until_real_offer_loaded": true,
-    "non_subscription_access_disclosed": true,
+    "readiness_contract": {
+      "catalogConfigured": "real productId and basePlanId both present",
+      "serverVerificationReady": "usable service-account key material exists for Play verification and Firestore writes",
+      "configured": "catalogConfigured && serverVerificationReady"
+    },
+    "client_fail_closed_until_ready": true,
+    "server_fail_closed_until_ready": true,
+    "production_observed": {
+      "configured": false,
+      "catalogConfigured": false,
+      "serverVerificationReady": false
+    },
     "subscription_product_created_or_verified": false,
     "product_id": null,
     "base_plan_id": null,
@@ -99,53 +85,54 @@
     "device_purchase_test": "not_started",
     "device_restore_test": "not_started"
   },
+  "verification": {
+    "pr21_merge_commit": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
+    "typescript": "pass",
+    "tests": "28/28 pass",
+    "test_files": 8,
+    "vite_build": "pass",
+    "production_smoke_pre_merge": "pass",
+    "production_smoke_post_merge": "pass",
+    "primary_ai_smoke": "pass",
+    "secondary_health_billing_parity": "pass",
+    "android_debug_build": "pass",
+    "release_aab_build": "pass_unsigned"
+  },
+  "debug_ci_artifact": {
+    "run_id": 36209949622,
+    "job_id": 108314212142,
+    "certificate_continuity": false,
+    "artifact_name": "basira-debug-apk-runner-signed-unverified",
+    "artifact_id": 10895266431,
+    "artifact_zip_digest": "sha256:e07d28888b541ba69afdcdfdde5fe4f60694e12fba673c2fa7368c0572341b45",
+    "update_compatible_with_known_install": false
+  },
   "release_pipeline": {
-    "workflow": ".github/workflows/android-release.yml",
-    "merged": true,
-    "merge_commit": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
-    "r8_optional_facebook_fix": true,
-    "validated_head": "c4d9dd70b40494fd0f063017c3cb9eaea5bba7f1",
-    "workflow_run_id": 36208238873,
-    "job_id": 108309243578,
+    "run_id": 36209949635,
+    "job_id": 108314212201,
     "bundle_release": "pass",
     "r8_minify": "pass",
     "resource_shrink": "pass",
     "gradle_tasks": 255,
     "aab_structure_verification": "pass",
-    "aab_size_bytes_approx": 7397487,
-    "aab_sha256": "c133ae89450d8438663d0f0d35ee3ee0e46f6a5a4746bf706716b3941b606256",
+    "aab_sha256": "93dd5008210e4a812c2010249ccd49a82b34cca21ce5f91ac94ed0f4d0b541f8",
     "signed": false,
     "publishable": false,
-    "artifact_name": "basira-release-aab-candidate",
-    "artifact_id": 10894992323,
-    "artifact_zip_digest": "sha256:7cebe48ed02d8d80f673172d1966ad083ebe0708c9ec44666813a1264930f661",
-    "artifact_expires_at": "2026-10-03T01:26:57Z"
-  },
-  "verification": {
-    "typescript": "pass",
-    "tests": "24/24 pass",
-    "test_files": 8,
-    "vite_build": "pass",
-    "firebase_named_database_validator": "pass",
-    "production_server_runtime_smoke": "pass",
-    "permanent_billing_production_smoke": "pass",
-    "post_pr20_deploy_production_smoke": "pass",
-    "capacitor_sync": "pass",
-    "android_auth_gate": "pass",
-    "android_debug_build": "pass",
-    "android_debug_apk_verification": "pass",
-    "release_aab_build": "pass_unsigned",
-    "release_signing_continuity": "blocked_missing_release_signing_secrets"
+    "artifact_name": "basira-release-aab-unsigned-candidate",
+    "artifact_id": 10895167635,
+    "artifact_zip_digest": "sha256:8e5675309bdaed1ff351cadf4817f6831fa6a25d7e5395d314ecaef35b9fbbb4",
+    "artifact_expires_at": "2026-10-03T01:57:46Z"
   },
   "production": {
-    "primary_render_service": "basira-1",
     "primary_url": "https://basira-1-2fwh.onrender.com",
-    "secondary_render_service": "basira",
+    "primary_role": "AI-serving production plus Billing",
+    "primary_health": "ok",
+    "primary_ai_ready": true,
     "secondary_url": "https://basira-qx6d.onrender.com",
-    "auto_deploy_branch": "main",
-    "runtime_head_live_on_primary": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
-    "runtime_head_live_on_secondary": "046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1",
-    "billing_safe_when_unconfigured": true
+    "secondary_role": "deployment and Billing parity unless AI credentials are configured later",
+    "secondary_health": "ok",
+    "secondary_ai_ready": false,
+    "extended_billing_schema_live_on_both": true
   },
   "latest_installable_known_good_apk": {
     "filename": "BASIRA-palm-hotfix.apk",
@@ -156,23 +143,13 @@
     "contains_new_play_billing": false
   },
   "external_activation_blockers": [
-    "Authenticated Google Play Console or Android Publisher access to create/verify the real subscription product and base plan",
-    "FIREBASE_SERVICE_ACCOUNT_JSON for named Firestore rules deployment and/or server Firestore access",
-    "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher permission",
-    "Actual Play upload/release keystore and the four BASIRA_RELEASE_* GitHub secrets",
-    "Exact real PLAY_SUBSCRIPTION_PRODUCT_ID and PLAY_SUBSCRIPTION_BASE_PLAN_ID on production Render services",
-    "Play-distributed physical-device purchase/restore/cancellation/expiry tests"
-  ],
-  "next_steps": [
-    "Do not reimplement Billing, AdMob, Google sign-in, palm handling, Firestore targeting, or the release AAB pipeline",
-    "Use authenticated Play Console/Work browser to create or verify the subscription and base plan, then record exact IDs/price/period",
-    "Configure Google Play and Firebase service-account credentials securely",
-    "Set exact billing IDs and credentials on Render and verify /api/billing/config becomes configured true",
-    "Deploy Firestore rules successfully to the named BASIRA database",
-    "Inspect Play App Signing/upload-key state before restoring or creating signing credentials",
-    "Populate release signing secrets and rebuild a signed AAB",
-    "Run physical Play testing for sign-in, free readings, rewarded ads, purchase, restore, cancellation and expiry",
-    "Proceed to Play release checks only after all device gates pass"
+    "Create/verify real Google Play subscription Product and Base Plan",
+    "Configure GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher permission",
+    "Configure FIREBASE_SERVICE_ACCOUNT_JSON where needed for Firestore/rules access",
+    "Deploy hardened Firestore rules to the named database",
+    "Inspect Play App Signing/upload-key state and restore the real release/upload keystore",
+    "Populate BASIRA_RELEASE_* signing secrets",
+    "Run Play-distributed physical-device sign-in/ad/purchase/restore/cancellation/expiry tests"
   ],
   "activation_runbook": "docs/PLAY_ACTIVATION_RUNBOOK.md"
 }

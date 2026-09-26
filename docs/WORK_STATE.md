@@ -1,151 +1,136 @@
 # BASIRA Current Work State
 
-Updated: 2026-09-26, Europe/Amsterdam
+Updated: 2026-09-26 04:01 Europe/Amsterdam
 
 ## Read this first
 
-This is the canonical handoff for future ChatGPT/Codex/Work sessions. Continue from this state. Do not restart Firebase, Google Sign-In, AdMob, palm handling, Play Billing, Firestore targeting, or release-pipeline diagnosis from the beginning.
+This is the canonical handoff. Continue from this state; do not restart Firebase, Google Sign-In, AdMob, palm handling, Play Billing, Firestore targeting, or release-pipeline diagnosis from the beginning.
 
 ## Canonical baseline
 
 - Repository: `amirhamrouni/basira`
 - Canonical branch: `main`
-- Current verified main/runtime head before this handoff-only commit: `046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1`
-- Billing implementation PR: `#17`
-- Permanent Billing production-smoke PR: `#18`
-- Firestore/Play activation-prep PR: `#19`
-- Release AAB pipeline PR: `#20`, merged as `046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1`
+- Latest verified runtime code merge: `dd8a00605ce1832fe7b7b0e947f5607729df9346`
+- PR `#21` hardened Billing readiness and CI truth gates.
 - Android package: `com.basira.spiritportal`
-- Current Android version in source: `1.0 (1)`
+- Android version: `1.0 (1)`
+- Java 21, Gradle 8.14.3, minSdk 24, compile/target SDK 36.
 
 ## Invariants that must not regress
 
-### Palm reading
+### Palm
 
-- Any genuine visible human palm is valid even if fine lines are faint, cropped, dim, or unevenly lit.
-- `ERROR_PALM_LINES_UNREADABLE` is not an accepted rejection path.
-- If detail is limited, complete a limited reading from genuinely visible major lines, contours, proportions, mounts, branches, or intersections.
-- Never invent marks that are not visible.
-- Keep the palm preview unfiltered.
+Any genuine visible human palm is valid even when fine lines are faint/cropped/dim. `ERROR_PALM_LINES_UNREADABLE` is not an accepted rejection path. When detail is limited, complete a limited reading from only genuinely visible features. Never invent marks. Keep the palm preview unfiltered.
 
 ### Google Sign-In
 
 - Firebase project: `gen-lang-client-0217548336`
-- Active known BASIRA signing SHA-1: `D3:1F:0E:80:0F:45:20:5E:5B:BB:EE:DC:0A:70:12:A4:C6:A8:E6:E3`
-- Active known BASIRA signing SHA-256: `C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68`
-- Native sign-in tries Credential Manager first, then the legacy Google flow.
-- Physical-device sign-in is still pending.
+- Known-good BASIRA signing SHA-1: `D3:1F:0E:80:0F:45:20:5E:5B:BB:EE:DC:0A:70:12:A4:C6:A8:E6:E3`
+- Known-good SHA-256: `C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68`
+- Credential Manager first, legacy Google fallback second.
+- Physical-device Google sign-in test is still pending.
 
 ### AdMob
 
 - `@capacitor-community/admob` `8.1.0`
 - App ID: `ca-app-pub-1233451496176046~9839666227`
 - Rewarded ID: `ca-app-pub-1233451496176046/5417205489`
-- Reward only from the native rewarded callback. No timer reward.
-- Physical-device rewarded-ad test remains pending.
+- Reward only from the native rewarded callback; no timer reward.
+- Physical-device rewarded-ad test is still pending.
 
-## Google Play Billing
+## Play Billing truth gate
 
-Billing is implemented and deployed but remains intentionally commercially inactive.
+Billing code is implemented and deployed but remains commercially inactive.
 
-Implemented:
+PR `#21` fixed a readiness bug: `/api/billing/config` must no longer report the system configured merely because Product ID and Base Plan ID exist. The public config now exposes safe booleans:
 
-- Google Play Billing Library `9.1.0` via native `BasiraBillingPlugin`.
-- Purchase + restore flows.
-- Product/Base Plan IDs loaded at runtime from `/api/billing/config`; no fake IDs are baked into the APK/AAB.
-- Firebase ID-token verification and Google Play `subscriptionsv2` server verification.
-- Purchase bound to Firebase UID via obfuscated account ID.
-- Server acknowledgement and server-controlled entitlement fields.
-- Client fail-closed expiry through `premiumUntil`.
-- Premium does not consume free-reading allowance or Energy.
-- Raw purchase tokens are not persisted; only a SHA-256 fingerprint is stored for audit identity.
-- Local 7-day Premium fallback is removed.
-- Premium screen uses real Play price/billing metadata, discloses renewal behavior, keeps a Google Play manage/cancel link, and disables purchase until a real offer loads.
+- `catalogConfigured`
+- `serverVerificationReady`
+- `configured = catalogConfigured && serverVerificationReady`
 
-Still not created/verified in Google Play:
+`serverVerificationReady` requires parseable service-account private-key material for Play verification and Firestore writes. One Google Play service account may be reused for Firestore only when it is actually valid and has the required IAM permissions. No credential contents are exposed by the public endpoint.
 
-- Subscription Product ID: `TBD`
-- Base Plan ID: `TBD`
-- Billing period: `TBD`
-- Actual Play price: `TBD`
+The Android client refuses to load/purchase/restore a Play subscription unless the real catalog exists and server verification is ready. The server verify endpoint also fails closed with `PLAY_SUBSCRIPTION_NOT_READY` until full readiness exists.
 
-Production Billing state remains `configured: false` until exact real IDs are created and placed on Render.
+Current production observation after PR `#21` rollout on both services:
 
-## Firestore production rules
+- `configured=false`
+- `catalogConfigured=false`
+- `serverVerificationReady=false`
 
-BASIRA uses the named Firestore database:
+This is expected because the real Play subscription catalog and service credentials are not configured yet.
 
-`ai-studio-6aad922f-e489-4552-a94a-9a140353fa50`
+Still TBD and must never be invented:
 
-The client and `firebase.json` explicitly target this database. `scripts/verify-firebase-config.mjs` is enforced in CI.
+- Subscription Product ID
+- Base Plan ID
+- Billing period
+- Play price/regions/renewal settings
 
-A real rules-deploy attempt was executed during the 2026-09-26 activation cycle:
+All prior Billing security invariants remain: server-side Play verification, Firebase ID-token verification, UID purchase binding, acknowledgement, server-controlled Premium fields, fail-closed `premiumUntil`, no raw purchase-token persistence, no local free-beta entitlement.
 
-- Temporary operations branch: `ops/firestore-deploy-once`
-- Deployment run: `36207958916`
-- Job: `108308392804`
-- Named-database target validator: PASS
-- Google Cloud authentication: FAILED before deployment
-- Verified cause: GitHub secret `FIREBASE_SERVICE_ACCOUNT_JSON` is missing/empty in the BASIRA repository.
-- No rules were deployed and no credential was exposed.
-- The temporary workflow on the operations branch was restored to its original manual-only form afterward. Do not merge the operations branch.
+## Firestore
 
-Therefore `firestore_rules_deployed = false` remains the canonical state.
+Named database: `ai-studio-6aad922f-e489-4552-a94a-9a140353fa50`.
 
-## Release AAB pipeline
+A real rules-deploy attempt on 2026-09-26 passed target validation but failed before deployment because `FIREBASE_SERVICE_ACCOUNT_JSON` is missing/empty. No rules were published. `firestore_rules_deployed=false` remains canonical.
 
-PR `#20` added `.github/workflows/android-release.yml` and fixed a release-only R8 issue.
+## CI truth gates
 
-The first release attempt exposed missing optional Facebook SDK references from `@capacitor-firebase/authentication`. BASIRA config enables only `google.com`, and Android variables enable Google only. The release fix is a targeted ProGuard/R8 `-dontwarn com.facebook.**`; the unused Facebook SDK was not added.
+### Debug APK
 
-Verified release run after the fix:
+The debug workflow no longer labels a runner-debug-signed APK as continuity-verified.
 
-- Head tested: `c4d9dd70b40494fd0f063017c3cb9eaea5bba7f1`
-- Release workflow run: `36208238873`
-- Release job: `108309243578`
-- TypeScript/tests/Vite: PASS (`24/24` tests across `8` files)
-- Capacitor sync: PASS
-- Android OAuth prebuild gate: PASS
+Latest verified debug run for PR `#21`:
+
+- Run: `36209949622`
+- Job: `108314212142`
+- Result: PASS
+- `BASIRA_DEBUG_KEYSTORE_BASE64` is still missing.
+- Continuity-verified upload: SKIPPED.
+- Actual artifact: `basira-debug-apk-runner-signed-unverified`
+- Artifact ID: `10895266431`
+- Artifact ZIP digest: `sha256:e07d28888b541ba69afdcdfdde5fe4f60694e12fba673c2fa7368c0572341b45`
+- This artifact is **not** update-compatible with the known installed BASIRA APK unless the correct signing key is restored and verified.
+
+### Release AAB
+
+Latest verified release run for PR `#21`:
+
+- Run: `36209949635`
+- Job: `108314212201`
+- TypeScript/tests/Vite: PASS (`28/28` tests across 8 files)
+- Capacitor sync / Android OAuth gate: PASS
 - `bundleRelease`: PASS
-- R8/minify/shrink: PASS
-- Gradle: `BUILD SUCCESSFUL`, `255` tasks
+- R8/minify/resource shrink: PASS
+- Gradle: `BUILD SUCCESSFUL`, 255 tasks
 - AAB structure verification: PASS
-- AAB size: about `7.3 MB`
-- AAB SHA-256: `c133ae89450d8438663d0f0d35ee3ee0e46f6a5a4746bf706716b3941b606256`
-- Release signing state: **UNSIGNED**
-- Artifact: `basira-release-aab-candidate`
-- Artifact ID: `10894992323`
-- Artifact ZIP digest: `sha256:7cebe48ed02d8d80f673172d1966ad083ebe0708c9ec44666813a1264930f661`
-- Artifact expires: `2026-10-03T01:26:57Z`
+- AAB size: about 7.3 MB
+- AAB SHA-256: `93dd5008210e4a812c2010249ccd49a82b34cca21ce5f91ac94ed0f4d0b541f8`
+- Signing verification: `SIGNED_RELEASE_AAB=false`
+- Signed artifact upload: SKIPPED
+- Actual artifact: `basira-release-aab-unsigned-candidate`
+- Artifact ID: `10895167635`
+- Artifact ZIP digest: `sha256:8e5675309bdaed1ff351cadf4817f6831fa6a25d7e5395d314ecaef35b9fbbb4`
+- Expires: `2026-10-03T01:57:46Z`
 
-The workflow explicitly verified that all four release signing secrets are absent/incomplete:
+The four `BASIRA_RELEASE_*` signing secrets are still absent/incomplete. The unsigned AAB is validation-only, not publishable.
 
-- `BASIRA_RELEASE_KEYSTORE_BASE64`
-- `BASIRA_RELEASE_KEYSTORE_PASSWORD`
-- `BASIRA_RELEASE_KEY_ALIAS`
-- `BASIRA_RELEASE_KEY_PASSWORD`
+## Production verification after PR #21
 
-The unsigned candidate is useful for release-build validation only. It must not be uploaded to Play as a publishable release.
+PR `#21` merged as `dd8a00605ce1832fe7b7b0e947f5607729df9346`.
 
-The older debug signing secret `BASIRA_DEBUG_KEYSTORE_BASE64` is also still missing, so CI debug APKs do not have verified certificate continuity with the known-good installed BASIRA APK.
+A post-merge production smoke rerun completed successfully:
 
-## Verification after PR #20 merge
+- Primary `https://basira-1-2fwh.onrender.com`: health `ok`, `aiReady=true`, Billing extended schema present and all readiness flags false.
+- Secondary `https://basira-qx6d.onrender.com`: health `ok`, Billing extended schema present and all readiness flags false; `aiReady=false` because this service currently has no AI provider configured.
+- Treat the primary as the AI-serving production target. Treat the secondary as deployment/Billing parity unless its AI credentials are explicitly configured later.
+- Live Tarot, follow-up context, and memory smoke on primary: PASS.
 
-PR `#20` merged as `046fa6ea08f98c7fb0fbc7aee218aba0778f1ad1`.
+## Latest known-good update-compatible APK
 
-- Quality gate: PASS
-- Production smoke before merge: PASS
-- Android debug workflow: PASS
-- Release AAB workflow: PASS
-- Primary Render `basira-1`: `046fa6e...` LIVE
-- Secondary Render `basira`: `046fa6e...` LIVE
-- Production smoke re-run after both Render deployments: PASS
+Still `BASIRA-palm-hotfix.apk`:
 
-Runtime Billing remains safely unconfigured until the real Play catalog is created.
-
-## Latest known-good installed/update-compatible APK
-
-- Filename: `BASIRA-palm-hotfix.apk`
 - SHA-256: `1263163097af98a08740cdde27802b731cf24284f1eb65a62dc17a2a4f2e4532`
 - Signing SHA-1: `D3:1F:0E:80:0F:45:20:5E:5B:BB:EE:DC:0A:70:12:A4:C6:A8:E6:E3`
 - Contains real AdMob + palm hotfix.
@@ -153,17 +138,14 @@ Runtime Billing remains safely unconfigured until the real Play catalog is creat
 
 ## Remaining external blockers only
 
-The implementation/build/deploy work is not the blocker anymore. The remaining gates require authenticated Google/signing material not available in the current connected tools:
+1. In authenticated Play Console, create/verify the real BASIRA Subscription Product and Base Plan and record exact immutable IDs, period, price, regions and renewal settings.
+2. Configure `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` with Android Publisher permission.
+3. Configure `FIREBASE_SERVICE_ACCOUNT_JSON` where required for Firestore server/rules access.
+4. Put the exact Play IDs + valid credentials on the intended production service(s) and verify `/api/billing/config` becomes `configured=true` only when all readiness checks pass.
+5. Deploy the hardened Firestore rules successfully to the named database.
+6. Inspect Play App Signing/upload-key state, then restore the real release/upload keystore and the four `BASIRA_RELEASE_*` CI secrets. Do not invent or rotate keys blindly.
+7. Restore `BASIRA_DEBUG_KEYSTORE_BASE64` only if an update-compatible debug build is still needed.
+8. Use a Play testing track and verify on a physical Android device: Google Sign-In → three free readings → rewarded ad → purchase → Premium entitlement → restore → cancellation/expiry.
+9. Only after those gates pass, build the signed publishable AAB and continue Play release checks.
 
-1. Open BASIRA in authenticated Google Play Console and create/confirm the real Subscription Product and Base Plan.
-2. Record the exact immutable Product ID, Base Plan ID, billing period, price, regions, renewal/grace/account-hold settings.
-3. Create/configure a Google service account with Android Publisher access and securely supply `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`.
-4. Supply `FIREBASE_SERVICE_ACCOUNT_JSON` with permissions needed for server Firestore writes and/or rules deployment.
-5. Set exact Play IDs + credentials on intended Render production services and verify `/api/billing/config` reports `configured: true`.
-6. Re-run `Deploy BASIRA Firestore Rules`; it must succeed against the named database before marking rules deployed.
-7. Recover/configure the actual Play upload/release keystore and populate the four `BASIRA_RELEASE_*` secrets. Do not invent or rotate a key without first checking Play Console App Signing state.
-8. Restore debug signing continuity if an update-compatible debug/device build is still required.
-9. Distribute through Play testing and verify on a physical Android device: Google Sign-In → three free readings → rewarded-ad path → purchase → Premium entitlement → restore → cancellation/expiry.
-10. Only then use the release workflow to produce the signed publishable AAB and proceed with Play release checks.
-
-Use `docs/PLAY_ACTIVATION_RUNBOOK.md` for the external activation sequence. Do not reimplement Billing, AdMob, sign-in, palm handling, Firestore targeting, or the release AAB pipeline.
+Use `docs/PLAY_ACTIVATION_RUNBOOK.md` for activation. Do not reimplement Billing, AdMob, Google sign-in, palm handling, Firestore targeting, or the release pipeline.
