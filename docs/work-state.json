@@ -1,6 +1,6 @@
 {
   "schema_version": 8,
-  "updated_at": "2026-09-27T22:29:00+02:00",
+  "updated_at": "2026-09-27T22:32:00+02:00",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "canonical_branch": "main",
@@ -9,7 +9,7 @@
     "resume_here_every_session": true,
     "current_phase_number": 6,
     "current_phase_name": "Google Play commercial activation",
-    "first_unfinished_action": "Configure GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher access and FIREBASE_SERVICE_ACCOUNT_JSON; then verify /api/billing/config configured=true.",
+    "first_unfinished_action": "OWNER SECRET ACTION: create/provide GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher access (and FIREBASE_SERVICE_ACCOUNT_JSON if separate). Then set on Render, deploy named Firestore rules, and run Play-distributed physical-device purchase/restore gates.",
     "do_not_restart_completed_phases": true
   },
   "last_verified_runtime_head": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
@@ -88,8 +88,12 @@
     "server_fail_closed_until_ready": true,
     "production_observed": {
       "configured": false,
-      "catalogConfigured": "pending redeploy verification",
-      "serverVerificationReady": false
+      "catalogConfigured": true,
+      "serverVerificationReady": false,
+      "verified_on": [
+        "https://basira-1-2fwh.onrender.com/api/billing/config",
+        "https://basira-qx6d.onrender.com/api/billing/config"
+      ]
     },
     "subscription_product_created_or_verified": true,
     "product_id": "basira_premium_monthly",
@@ -156,7 +160,8 @@
     "secondary_role": "deployment and Billing parity unless AI credentials are configured later",
     "secondary_health": "ok",
     "secondary_ai_ready": false,
-    "extended_billing_schema_live_on_both": true
+    "extended_billing_schema_live_on_both": true,
+    "latest_billing_runtime_verification": "both services live; catalogConfigured=true; configured=false only because serverVerificationReady=false"
   },
   "latest_installable_known_good_apk": {
     "filename": "BASIRA-palm-hotfix.apk",
