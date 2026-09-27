@@ -1,6 +1,6 @@
 {
   "schema_version": 8,
-  "updated_at": "2026-09-26T04:45:00+02:00",
+  "updated_at": "2026-09-27T00:00:00+02:00",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "canonical_branch": "main",
@@ -9,7 +9,7 @@
     "resume_here_every_session": true,
     "current_phase_number": 6,
     "current_phase_name": "Google Play commercial activation",
-    "first_unfinished_action": "Open authenticated Google Play Console for BASIRA and create or verify the real Subscription Product and Base Plan",
+    "first_unfinished_action": "OWNER ACTION: In Google Play Console for com.basira.spiritportal, create/verify the real BASIRA Premium monthly subscription at EUR 4.99 and provide/record the console-confirmed Product ID and Base Plan ID. No free authenticated Play Console write integration is currently available.",
     "do_not_restart_completed_phases": true
   },
   "last_verified_runtime_head": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
@@ -151,7 +151,7 @@
     "contains_new_play_billing": false
   },
   "external_activation_blockers": [
-    "Create/verify real Google Play subscription Product and Base Plan",
+    "OWNER ACTION: Create/verify real Google Play BASIRA Premium subscription and Base Plan in authenticated Play Console; record exact console-confirmed Product ID/Base Plan ID, monthly period, EUR 4.99/localized pricing, regions and renewal settings. TinyFish paid automation is intentionally not used.",
     "Configure GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher permission",
     "Configure FIREBASE_SERVICE_ACCOUNT_JSON where needed for Firestore/rules access",
     "Deploy hardened Firestore rules to the named database",
@@ -170,5 +170,13 @@
     "Run Play testing track physical-device gates",
     "Complete final Play release checks"
   ],
-  "activation_runbook": "docs/PLAY_ACTIVATION_RUNBOOK.md"
+  "activation_runbook": "docs/PLAY_ACTIVATION_RUNBOOK.md",
+  "last_external_attempt": {
+    "at": "2026-09-26",
+    "stage": "Play Console subscription activation",
+    "tool": "TinyFish saved profile sds / prof_fffdbd806f7e4b7a",
+    "result": "timeout at step 138 before any catalog mutation",
+    "money_policy": "user declined paid automation; do not top up TinyFish",
+    "mutation_verified": false
+  }
 }
