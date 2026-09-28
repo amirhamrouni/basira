@@ -149,3 +149,11 @@ Still `BASIRA-palm-hotfix.apk`:
 9. Only after those gates pass, build the signed publishable AAB and continue Play release checks.
 
 Use `docs/PLAY_ACTIVATION_RUNBOOK.md` for activation. Do not reimplement Billing, AdMob, Google sign-in, palm handling, Firestore targeting, or the release pipeline.
+
+## Continuation verified 2026-09-28
+
+- Firestore rules workflow run `36353108328`, job `108726740483` (`deploy-rules`) completed successfully. GitHub job steps show target validation, Google authentication, Firebase CLI installation and rules deployment all succeeded.
+- Owner reports production Billing config on primary Render as `configured=true`, `catalogConfigured=true`, `serverVerificationReady=true`; this was not rechecked in this session. Product `basira_premium_monthly`, base plan `monthly-premium`, EUR 4.99/month, and manually signed Internal Testing AAB are owner-provided current state.
+- Existing upload certificate: SHA-1 `AE:F9:0F:BC:E5:28:92:1E:04:8D:29:86:DF:4C:40:A8:7C:7E:6E:55`; SHA-256 `6F:03:E4:38:61:A3:27:F2:8E:1C:1B:59:21:89:3C:7F:6C:BE:C1:B5:53:4B:DC:E8:A2:54:E6:07:7F:DE:B1:E4`. Do not replace or rotate it.
+- `.github/workflows/android-release.yml` requires four `BASIRA_RELEASE_*` secrets. Their presence could not be inspected in this session: the connected GitHub interface does not expose Actions secrets, and the cloud browser is signed out. Existing keystore bytes and passwords were not accessible in the workspace. No signed CI AAB was produced or claimed.
+- Resume at secure restoration of the existing upload-keystore material into GitHub Actions secrets; then dispatch BASIRA Release AAB and require tests, Android verification, R8, `bundleRelease`, `SIGNED_RELEASE_AAB=true`, artifact `basira-release-aab-signed`, and certificate match. Physical Play tests remain pending.
