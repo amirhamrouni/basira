@@ -157,3 +157,10 @@ Use `docs/PLAY_ACTIVATION_RUNBOOK.md` for activation. Do not reimplement Billing
 - Existing upload certificate: SHA-1 `AE:F9:0F:BC:E5:28:92:1E:04:8D:29:86:DF:4C:40:A8:7C:7E:6E:55`; SHA-256 `6F:03:E4:38:61:A3:27:F2:8E:1C:1B:59:21:89:3C:7F:6C:BE:C1:B5:53:4B:DC:E8:A2:54:E6:07:7F:DE:B1:E4`. Do not replace or rotate it.
 - `.github/workflows/android-release.yml` requires four `BASIRA_RELEASE_*` secrets. Their presence could not be inspected in this session: the connected GitHub interface does not expose Actions secrets, and the cloud browser is signed out. Existing keystore bytes and passwords were not accessible in the workspace. No signed CI AAB was produced or claimed.
 - Resume at secure restoration of the existing upload-keystore material into GitHub Actions secrets; then dispatch BASIRA Release AAB and require tests, Android verification, R8, `bundleRelease`, `SIGNED_RELEASE_AAB=true`, artifact `basira-release-aab-signed`, and certificate match. Physical Play tests remain pending.
+
+## Upload key verification 2026-09-28
+
+- The owner-supplied original JKS backup was opened locally with its supplied credential. It contains one `PrivateKeyEntry`.
+- `keytool` SHA-1 and SHA-256 fingerprints both matched the recorded BASIRA Upload Key certificate exactly. No private key, password, keystore bytes, alias, or secret value was committed or logged.
+- GitHub Actions secrets could not be configured through the available GitHub connector; its operations do not include Actions Secrets management. The cloud browser GitHub session is signed out. Consequently no release workflow was dispatched and no signed CI AAB is claimed.
+- Resume at authenticated GitHub Actions secret configuration with the verified original keystore. Then run release workflow and verify AAB certificate continuity.
