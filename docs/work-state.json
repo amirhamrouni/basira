@@ -1,6 +1,6 @@
 {
-  "schema_version": 8,
-  "updated_at": "2026-09-28T16:44:00+02:00",
+  "schema_version": 9,
+  "updated_at": "2026-09-28T17:46:00+02:00",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "canonical_branch": "main",
@@ -9,7 +9,7 @@
     "resume_here_every_session": true,
     "current_phase_number": 6,
     "current_phase_name": "Google Play commercial activation",
-    "first_unfinished_action": "Authenticated GitHub repository secrets list contains only FIREBASE_SERVICE_ACCOUNT_JSON. Add four BASIRA_RELEASE_* secrets from verified original upload key and credential via secure owner action; then run signed AAB.",
+    "first_unfinished_action": "Use the Play-distributed Internal Testing release for physical Android gates: add/select tester(s), install via Play, verify Google Sign-In, free readings, rewarded ad, purchase, Premium entitlement, restore, cancellation/expiry.",
     "do_not_restart_completed_phases": true
   },
   "last_verified_runtime_head": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
@@ -31,7 +31,7 @@
       "sha256": "C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68"
     },
     "github_actions_debug_signing_secret": "missing",
-    "release_signing_secrets": "missing_verified_in_authenticated_github_ui_2026-09-28",
+    "release_signing_secrets": "configured_verified_by_authenticated_github_ui_2026-09-28_names_only_values_unreadable",
     "play_app_signing_certificate": {
       "sha1": "58:AB:C7:B6:1B:1E:EA:2B:24:2B:7C:E0:8D:7C:73:62:64:97:A6:4D",
       "sha256": "1D:F3:12:1A:3D:02:81:34:19:3A:C6:04:10:E8:3A:81:1F:5F:0C:74:39:D2:4F:28:93:EF:8F:FE:81:23:F6:4E"
@@ -47,6 +47,29 @@
       "private_key_entry_count": 1,
       "credentials_valid_for_keystore": true,
       "secret_values_recorded": false
+    },
+    "ci_signed_release_aab": {
+      "verified_on": "2026-09-28",
+      "workflow_run_id": 36445267701,
+      "job_id": 109005847007,
+      "commit_sha": "411656e04ff30b3e3a594807afada0e2e0764b6d",
+      "required_secret_names_present": true,
+      "secrets_values_recorded": false,
+      "tests": "28/28 pass",
+      "android_verification": "pass",
+      "bundle_release": "pass",
+      "r8_minify": "pass",
+      "gradle_build": "BUILD SUCCESSFUL in 3m 14s; 256 actionable tasks executed",
+      "signed_release_aab": true,
+      "signing_verification": "GitHub jarsigner verification printed SIGNED_RELEASE_AAB=true; local keytool -printcert -jarfile matched existing BASIRA Upload Key certificate.",
+      "artifact_name": "basira-release-aab-signed",
+      "artifact_id": 10980462298,
+      "artifact_size_bytes": 7454996,
+      "artifact_zip_digest": "sha256:889816b52c8f1f5dd50f529a008b1925591323149ab3295f79e6e0bb12c49887",
+      "artifact_expires_at": "2026-10-12T15:43:36Z",
+      "aab_sha256": "7d33033872447dfe825bd5fe49dc55f89957dc2864dc9c5030dcf43e964a7b56",
+      "upload_key_sha1": "AE:F9:0F:BC:E5:28:92:1E:04:8D:29:86:DF:4C:40:A8:7C:7E:6E:55",
+      "upload_key_sha256": "6F:03:E4:38:61:A3:27:F2:8E:1C:1B:59:21:89:3C:7F:6C:BE:C1:B5:53:4B:DC:E8:A2:54:E6:07:7F:DE:B1:E4"
     }
   },
   "firebase": {
@@ -126,12 +149,27 @@
     "primary_ai_smoke": "pass",
     "secondary_health_billing_parity": "pass",
     "android_debug_build": "pass",
-    "release_aab_build": "pass_unsigned",
+    "release_aab_build": "pass_signed",
     "firestore_rules_workflow": {
       "run_id": 36353108328,
       "job_id": 108726740483,
       "conclusion": "success",
       "verified_via_github_jobs": true
+    },
+    "signed_release_aab_workflow": {
+      "run_id": 36445267701,
+      "job_id": 109005847007,
+      "conclusion": "success",
+      "commit_sha": "411656e04ff30b3e3a594807afada0e2e0764b6d",
+      "tests": "28/28 pass",
+      "android_verification": "pass",
+      "bundle_release": "pass",
+      "r8_minify": "pass",
+      "signed_release_aab": true,
+      "artifact_name": "basira-release-aab-signed",
+      "artifact_id": 10980462298,
+      "aab_sha256": "7d33033872447dfe825bd5fe49dc55f89957dc2864dc9c5030dcf43e964a7b56",
+      "certificate_match": "existing BASIRA Upload Key SHA-1 and SHA-256 match"
     }
   },
   "debug_ci_artifact": {
@@ -144,20 +182,24 @@
     "update_compatible_with_known_install": false
   },
   "release_pipeline": {
-    "run_id": 36209949635,
-    "job_id": 108314212201,
+    "run_id": 36445267701,
+    "job_id": 109005847007,
+    "commit_sha": "411656e04ff30b3e3a594807afada0e2e0764b6d",
     "bundle_release": "pass",
     "r8_minify": "pass",
     "resource_shrink": "pass",
-    "gradle_tasks": 255,
+    "gradle_tasks": 256,
     "aab_structure_verification": "pass",
-    "aab_sha256": "93dd5008210e4a812c2010249ccd49a82b34cca21ce5f91ac94ed0f4d0b541f8",
-    "signed": false,
-    "publishable": false,
-    "artifact_name": "basira-release-aab-unsigned-candidate",
-    "artifact_id": 10895167635,
-    "artifact_zip_digest": "sha256:8e5675309bdaed1ff351cadf4817f6831fa6a25d7e5395d314ecaef35b9fbbb4",
-    "artifact_expires_at": "2026-10-03T01:57:46Z",
+    "aab_sha256": "7d33033872447dfe825bd5fe49dc55f89957dc2864dc9c5030dcf43e964a7b56",
+    "signed": true,
+    "publishable": true,
+    "signed_release_aab": true,
+    "signing_certificate_sha1": "AE:F9:0F:BC:E5:28:92:1E:04:8D:29:86:DF:4C:40:A8:7C:7E:6E:55",
+    "signing_certificate_sha256": "6F:03:E4:38:61:A3:27:F2:8E:1C:1B:59:21:89:3C:7F:6C:BE:C1:B5:53:4B:DC:E8:A2:54:E6:07:7F:DE:B1:E4",
+    "artifact_name": "basira-release-aab-signed",
+    "artifact_id": 10980462298,
+    "artifact_zip_digest": "sha256:889816b52c8f1f5dd50f529a008b1925591323149ab3295f79e6e0bb12c49887",
+    "artifact_expires_at": "2026-10-12T15:43:36Z",
     "manual_first_play_aab": {
       "uploaded": true,
       "internal_release_published_by_owner": true,
@@ -177,8 +219,7 @@
     "secondary_role": "deployment and Billing parity unless AI credentials are configured later",
     "secondary_health": "ok",
     "secondary_ai_ready": false,
-    "extended_billing_schema_live_on_both": true,
-    "latest_billing_runtime_verification": "both services live; catalogConfigured=true; configured=false only because serverVerificationReady=false"
+    "extended_billing_schema_live_on_both": true
   },
   "latest_installable_known_good_apk": {
     "filename": "BASIRA-palm-hotfix.apk",
@@ -189,9 +230,9 @@
     "contains_new_play_billing": false
   },
   "external_activation_blockers": [
-    "Restore existing BASIRA upload keystore material securely and configure four BASIRA_RELEASE_* GitHub Actions secrets",
-    "Run signed release workflow and verify output signing certificate against the existing upload key",
-    "Add internal tester(s) and run Play-distributed physical-device sign-in/ad/purchase/restore/cancellation/expiry tests"
+    "Add/select Internal Testing tester(s) in Play Console if still absent",
+    "Run Play-distributed physical-device gates: Google Sign-In, three free readings, rewarded ad, purchase, Premium entitlement, restore, cancellation/expiry",
+    "Complete final Play release checks after physical-device gates pass"
   ],
   "activation_sequence": [
     "Authenticated Play Console: create/verify Product and Base Plan",
@@ -201,6 +242,7 @@
     "Deploy Firestore rules to named database",
     "Inspect Play App Signing and restore release/upload key",
     "Build and verify signed AAB",
+    "Add/select Internal Testing tester(s)",
     "Run Play testing track physical-device gates",
     "Complete final Play release checks"
   ],
