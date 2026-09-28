@@ -1,6 +1,6 @@
 {
   "schema_version": 8,
-  "updated_at": "2026-09-27T22:32:00+02:00",
+  "updated_at": "2026-09-28T16:44:00+02:00",
   "timezone": "Europe/Amsterdam",
   "repository": "amirhamrouni/basira",
   "canonical_branch": "main",
@@ -9,7 +9,7 @@
     "resume_here_every_session": true,
     "current_phase_number": 6,
     "current_phase_name": "Google Play commercial activation",
-    "first_unfinished_action": "OWNER SECRET ACTION: create/provide GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher access (and FIREBASE_SERVICE_ACCOUNT_JSON if separate). Then set on Render, deploy named Firestore rules, and run Play-distributed physical-device purchase/restore gates.",
+    "first_unfinished_action": "Restore the existing BASIRA upload keystore securely and configure four BASIRA_RELEASE_* GitHub Actions secrets; then dispatch BASIRA Release AAB and verify certificate continuity. Physical Play device gates remain pending.",
     "do_not_restart_completed_phases": true
   },
   "last_verified_runtime_head": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
@@ -31,7 +31,7 @@
       "sha256": "C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68"
     },
     "github_actions_debug_signing_secret": "missing",
-    "release_signing_secrets": "missing_or_incomplete",
+    "release_signing_secrets": "unverified_in_current_session",
     "play_app_signing_certificate": {
       "sha1": "58:AB:C7:B6:1B:1E:EA:2B:24:2B:7C:E0:8D:7C:73:62:64:97:A6:4D",
       "sha256": "1D:F3:12:1A:3D:02:81:34:19:3A:C6:04:10:E8:3A:81:1F:5F:0C:74:39:D2:4F:28:93:EF:8F:FE:81:23:F6:4E"
@@ -45,14 +45,15 @@
     "project_id": "gen-lang-client-0217548336",
     "firestore_database_id": "ai-studio-6aad922f-e489-4552-a94a-9a140353fa50",
     "firestore_rules_hardened_in_source": true,
-    "firestore_rules_deployed": false,
-    "firebase_service_account_secret": "missing",
+    "firestore_rules_deployed": true,
+    "firebase_service_account_secret": "configured_for_rules_workflow_value_unreadable",
     "last_rules_deploy_attempt": {
-      "run_id": 36207958916,
-      "job_id": 108308392804,
+      "run_id": 36353108328,
+      "job_id": 108726740483,
       "target_validator": "pass",
-      "google_auth": "failed_missing_credentials_json",
-      "rules_published": false
+      "google_auth": "pass",
+      "rules_published": true,
+      "conclusion": "success"
     }
   },
   "google_sign_in": {
@@ -87,20 +88,21 @@
     "client_fail_closed_until_ready": true,
     "server_fail_closed_until_ready": true,
     "production_observed": {
-      "configured": false,
+      "configured": true,
       "catalogConfigured": true,
-      "serverVerificationReady": false,
+      "serverVerificationReady": true,
       "verified_on": [
         "https://basira-1-2fwh.onrender.com/api/billing/config",
         "https://basira-qx6d.onrender.com/api/billing/config"
-      ]
+      ],
+      "source": "owner-provided prior production verification; not rechecked in this session"
     },
     "subscription_product_created_or_verified": true,
     "product_id": "basira_premium_monthly",
     "base_plan_id": "monthly-premium",
     "billing_period": "P1M",
     "price": "EUR 4.99",
-    "google_play_service_account_configured": false,
+    "google_play_service_account_configured": true,
     "commercially_activated": true,
     "device_purchase_test": "not_started",
     "device_restore_test": "not_started"
@@ -116,7 +118,13 @@
     "primary_ai_smoke": "pass",
     "secondary_health_billing_parity": "pass",
     "android_debug_build": "pass",
-    "release_aab_build": "pass_unsigned"
+    "release_aab_build": "pass_unsigned",
+    "firestore_rules_workflow": {
+      "run_id": 36353108328,
+      "job_id": 108726740483,
+      "conclusion": "success",
+      "verified_via_github_jobs": true
+    }
   },
   "debug_ci_artifact": {
     "run_id": 36209949622,
@@ -148,7 +156,8 @@
       "version": "1 (1.0)",
       "api_level": "24+",
       "install_size": "4.79 MB",
-      "testers_selected": false
+      "testers_selected": false,
+      "upload_key_sha1": "AE:F9:0F:BC:E5:28:92:1E:04:8D:29:86:DF:4C:40:A8:7C:7E:6E:55"
     }
   },
   "production": {
@@ -172,10 +181,8 @@
     "contains_new_play_billing": false
   },
   "external_activation_blockers": [
-    "Configure GOOGLE_PLAY_SERVICE_ACCOUNT_JSON with Android Publisher permission",
-    "Configure FIREBASE_SERVICE_ACCOUNT_JSON where needed for Firestore/rules access",
-    "Deploy hardened Firestore rules to the named database",
-    "Populate BASIRA_RELEASE_* signing secrets for reproducible CI release signing",
+    "Restore existing BASIRA upload keystore material securely and configure four BASIRA_RELEASE_* GitHub Actions secrets",
+    "Run signed release workflow and verify output signing certificate against the existing upload key",
     "Add internal tester(s) and run Play-distributed physical-device sign-in/ad/purchase/restore/cancellation/expiry tests"
   ],
   "activation_sequence": [
