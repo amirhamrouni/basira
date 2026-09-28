@@ -40,6 +40,8 @@ if (process.argv.includes('--structure-only')) {
 }
 
 const googleServices = 'android/app/google-services.json';
+const expectedPlaySha1 = '58abc7b61b1eea2b242b7ce08d7c73626497a64d';
+const expectedWebClientId = '391040417078-90jpo9ld068p4jf6vjhki4tnhj78id6f.apps.googleusercontent.com';
 if (!fs.existsSync(googleServices)) {
   console.error('FAIL missing google-services.json. Native Google Sign-In cannot be accepted without it.');
   failed = true;
@@ -57,20 +59,22 @@ if (!fs.existsSync(googleServices)) {
       const androidOauthClient = oauthClients.find(client =>
         client.client_type === 1 &&
         client.android_info?.package_name === 'com.basira.spiritportal' &&
-        client.android_info?.certificate_hash
+        client.android_info?.certificate_hash?.toLowerCase() === expectedPlaySha1
       );
-      const webOauthClient = oauthClients.find(client => client.client_type === 3 && client.client_id);
+      const webOauthClient = oauthClients.find(client =>
+        client.client_type === 3 && client.client_id === expectedWebClientId
+      );
       if (!androidOauthClient) {
-        console.error('FAIL google-services.json has no Android OAuth client with a signing certificate.');
+        console.error('FAIL google-services.json has no Android OAuth client for the Play App Signing SHA-1.');
         failed = true;
       } else {
-        console.log('PASS google-services Android OAuth signing certificate');
+        console.log('PASS google-services Play App Signing SHA-1');
       }
       if (!webOauthClient) {
-        console.error('FAIL google-services.json has no Web OAuth client for Google ID tokens.');
+        console.error('FAIL google-services.json does not contain the expected Firebase Web OAuth client.');
         failed = true;
       } else {
-        console.log('PASS google-services Web OAuth client');
+        console.log('PASS google-services expected Web OAuth client');
       }
     }
   } catch {

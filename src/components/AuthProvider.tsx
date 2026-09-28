@@ -60,14 +60,10 @@ const provider = new GoogleAuthProvider();
 provider.addScope('email');
 provider.addScope('profile');
 
-const signInWithNativeGoogle = async () => {
-    try {
-        return await FirebaseAuthentication.signInWithGoogle();
-    } catch (credentialManagerError) {
-        console.warn('Google Credential Manager sign-in failed; retrying with the legacy Google flow.', credentialManagerError);
-        return FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
-    }
-};
+const signInWithNativeGoogle = () => FirebaseAuthentication.signInWithGoogle({
+    useCredentialManager: true,
+    skipNativeAuth: true,
+});
 
 const ensureUserProfile = async (currentUser: User) => {
     const userRef = doc(db, 'users', currentUser.uid);
@@ -148,6 +144,11 @@ const getAuthErrorMessage = (error: AuthError, lang: string = 'ar'): string => {
             ar: 'تسجيل Google غير مهيأ لهذه النسخة. أضف تطبيق Android ‏com.basira.spiritportal وملف google-services.json وبصمة SHA-1 في Firebase ثم أعد بناء التطبيق.',
             en: 'Google Sign-In is not configured for this build. Add the Android app, google-services.json and SHA-1 in Firebase, then rebuild.',
             fr: 'Google Sign-In n’est pas configuré pour cette version Android.'
+        },
+        'auth/google-credential-manager': {
+            ar: 'تعذّر تسجيل Google عبر Credential Manager. حدّث خدمات Google Play ثم أعد المحاولة.',
+            en: 'Google Credential Manager sign-in failed. Update Google Play services and try again.',
+            fr: 'La connexion Google via Credential Manager a échoué. Mettez à jour les services Google Play.'
         },
     };
     const msg = messages[error.code];
@@ -243,8 +244,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 'auth/configuration-not-found',
                 'auth/native-google-configuration'
             ]);
-            const normalized = Capacitor.isNativePlatform() && nativeSetupCodes.has(authErr.code)
-                ? Object.assign(authErr, { code: 'auth/native-google-configuration' })
+            const nativeMessage = String(authErr.message || '');
+            const normalized = Capacitor.isNativePlatform()
+                ? Object.assign(authErr, {
+                    code: nativeSetupCodes.has(authErr.code) || nativeMessage === '10'
+                        ? 'auth/native-google-configuration'
+                        : 'auth/google-credential-manager',
+                })
                 : authErr;
             setAuthError(getAuthErrorMessage(normalized, lang));
         }
