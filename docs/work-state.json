@@ -9,7 +9,7 @@
     "resume_here_every_session": true,
     "current_phase_number": 6,
     "current_phase_name": "Google Play commercial activation",
-    "first_unfinished_action": "Restore the existing BASIRA upload keystore securely and configure four BASIRA_RELEASE_* GitHub Actions secrets; then dispatch BASIRA Release AAB and verify certificate continuity. Physical Play device gates remain pending.",
+    "first_unfinished_action": "Existing upload keystore certificate verified locally. Configure four BASIRA_RELEASE_* secrets using supplied original keystore and credentials through authenticated GitHub Actions Secrets; then dispatch signed AAB and verify certificate match.",
     "do_not_restart_completed_phases": true
   },
   "last_verified_runtime_head": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
@@ -31,7 +31,7 @@
       "sha256": "C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68"
     },
     "github_actions_debug_signing_secret": "missing",
-    "release_signing_secrets": "unverified_in_current_session",
+    "release_signing_secrets": "not_configured_or_verifiable_from_available_github_access",
     "play_app_signing_certificate": {
       "sha1": "58:AB:C7:B6:1B:1E:EA:2B:24:2B:7C:E0:8D:7C:73:62:64:97:A6:4D",
       "sha256": "1D:F3:12:1A:3D:02:81:34:19:3A:C6:04:10:E8:3A:81:1F:5F:0C:74:39:D2:4F:28:93:EF:8F:FE:81:23:F6:4E"
@@ -39,6 +39,14 @@
     "upload_key_certificate": {
       "sha1": "AE:F9:0F:BC:E5:28:92:1E:04:8D:29:86:DF:4C:40:A8:7C:7E:6E:55",
       "sha256": "6F:03:E4:38:61:A3:27:F2:8E:1C:1B:59:21:89:3C:7F:6C:BE:C1:B5:53:4B:DC:E8:A2:54:E6:07:7F:DE:B1:E4"
+    },
+    "upload_keystore_local_verification": {
+      "verified_on": "2026-09-28",
+      "sha1_match": true,
+      "sha256_match": true,
+      "private_key_entry_count": 1,
+      "credentials_valid_for_keystore": true,
+      "secret_values_recorded": false
     }
   },
   "firebase": {
