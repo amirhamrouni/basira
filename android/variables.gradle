@@ -16,5 +16,8 @@ ext {
     rgcfaIncludeGoogle = true
     androidxCredentialsVersion = '1.6.0'
     androidxCredentialsPlayServicesAuthVersion = '1.6.0'
-    librariesIdentityGoogleidVersion = '1.2.1'
+    // 1.2.1 is compiled with Kotlin metadata 2.4, which AGP 8.13's
+    // release lint cannot consume yet. 1.2.0 keeps the Credential Manager
+    // security-bundle support without shipping a lint-incompatible artifact.
+    librariesIdentityGoogleidVersion = '1.2.0'
 }
