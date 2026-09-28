@@ -9,7 +9,7 @@
     "resume_here_every_session": true,
     "current_phase_number": 6,
     "current_phase_name": "Google Play commercial activation",
-    "first_unfinished_action": "Existing upload keystore certificate verified locally. Configure four BASIRA_RELEASE_* secrets using supplied original keystore and credentials through authenticated GitHub Actions Secrets; then dispatch signed AAB and verify certificate match.",
+    "first_unfinished_action": "Authenticated GitHub repository secrets list contains only FIREBASE_SERVICE_ACCOUNT_JSON. Add four BASIRA_RELEASE_* secrets from verified original upload key and credential via secure owner action; then run signed AAB.",
     "do_not_restart_completed_phases": true
   },
   "last_verified_runtime_head": "dd8a00605ce1832fe7b7b0e947f5607729df9346",
@@ -31,7 +31,7 @@
       "sha256": "C9:38:2E:C1:7F:B0:35:21:A9:5B:BE:57:5B:AE:02:CB:ED:86:2C:F6:1F:3A:42:7E:11:C7:15:62:F8:C6:93:68"
     },
     "github_actions_debug_signing_secret": "missing",
-    "release_signing_secrets": "not_configured_or_verifiable_from_available_github_access",
+    "release_signing_secrets": "missing_verified_in_authenticated_github_ui_2026-09-28",
     "play_app_signing_certificate": {
       "sha1": "58:AB:C7:B6:1B:1E:EA:2B:24:2B:7C:E0:8D:7C:73:62:64:97:A6:4D",
       "sha256": "1D:F3:12:1A:3D:02:81:34:19:3A:C6:04:10:E8:3A:81:1F:5F:0C:74:39:D2:4F:28:93:EF:8F:FE:81:23:F6:4E"
