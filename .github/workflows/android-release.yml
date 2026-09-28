@@ -21,15 +21,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Restore Firebase Android configuration
-        env:
-          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.BASIRA_GOOGLE_SERVICES_JSON_BASE64 }}
+      - name: Verify Firebase Android configuration
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-          fi
           test -s android/app/google-services.json
-          node -e "const c=require('./android/app/google-services.json').client; if(!c.some(x=>x.client_info?.android_client_info?.package_name==='com.basira.spiritportal'))process.exit(1)"
+          node scripts/verify-firebase-config.mjs
 
       - name: Install, test and sync
         run: |
