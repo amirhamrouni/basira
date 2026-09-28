@@ -14,11 +14,19 @@
       },
       "oauth_client": [
         {
-          "client_id": "391040417078-ft1jv4390ajsfggqsqmm633pdsmegl1j.apps.googleusercontent.com",
+          "client_id": "391040417078-oik3ja7g2rd3u4r4h26ba1np9aoshlal.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.basira.spiritportal",
-            "certificate_hash": "c7d0e1ff50980a9c929bb65fe800ab7b4befa149"
+            "certificate_hash": "58abc7b61b1eea2b242b7ce08d7c73626497a64d"
+          }
+        },
+        {
+          "client_id": "391040417078-t42sffm6mk7g58uqa6g8h2f6d9ugm3pa.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.basira.spiritportal",
+            "certificate_hash": "d31f0e800f45205e5bbbeedc0a7012a4c6a8e6e3"
           }
         },
         {
